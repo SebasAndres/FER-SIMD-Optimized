@@ -1,62 +1,66 @@
-section .text 
 
-extern malloc 
+section .data
+    OFFSET_FRAME_DATA equ 0
+    OFFSET_FRAME_ROWS equ 8
+    OFFSET_FRAME_COLS equ 12
 
+section .text
+
+; void apply_filter_asm(cv::Mat& image);
 global apply_filter_asm
-
 apply_filter_asm:    
-    ; char* data [rdi]
-    ; uint32_t width [esi]
-    ; uint32_t height [edx]
+
+    ; Arguments:
+    ; rdi: pointer to cv::Mat
 
     push rbp
     mov rbp, rsp
 
-    xor r8, r8 ; row
+    push rbx
+    push r12
+    push r13
+    push r14
+    push r15
+    sub rsp, 8
+    
+    ; Get the pointer to the image data
+    mov rax, [rdi + OFFSET_FRAME_DATA] ; pointer to data
+    mov rbx, rax ; rdi = pointer to image data
+
+    ; Get the number of rows and columns
+    mov esi, dword [rdi + OFFSET_FRAME_COLS] ; number of columns
+    mov edx, dword [rdi + OFFSET_FRAME_ROWS] ; number of rows
+
+    xor r8d, r8d; row
     .row_loop:
-        ; Calculate the row offset
-        mov rax, r8
-        mul esi 
-        mov r10, rax ; r10 = row offset
+        xor r9d, r9d ; column
 
-        xor r9, r9 ; column
         .col_loop:
-            ; Calculate how many bytes to process (up to 16 at a time)
-            mov rcx, rsi
-            sub rcx, r9
-            cmp rcx, 16
-            jl .process_tail
+        
+            xor rax, rax
+            mov eax, r8d
+            imul eax, esi     
+            add eax, r9d      
+            imul eax, eax, 3  
 
-            ; SIMD: process 16 bytes        
-            lea r11, [r10 + r9]
-            add r11, rdi
-            movdqu xmm0, [r11]         ; Use movdqu for unaligned memory access
-            pcmpeqb xmm1, xmm1         ; xmm1 = 0xFF..FF
-            pxor xmm0, xmm1            ; invert all bytes
-            movdqu [r11], xmm0         ; Use movdqu for unaligned memory access
+            mov r10b, byte [rbx + rax] 
 
-            add r9, 16
-            cmp r9, rsi
+            ; mov [rbx + rax], byte 0 
+
+            inc r9d
+            cmp r9d, esi
             jl .col_loop
-            jmp .next_row
 
-        .process_tail:
-            ; Process remaining bytes one by one
-            cmp rcx, 0
-            jle .next_row
-            lea r11, [r10 + r9]
-            add r11, rdi
-            movzx r12, byte [r11]
-            xor r12b, 0xFF
-            mov [r11], r12b
-            inc r9
-            cmp r9, rsi
-            jl .process_tail
-
-        .next_row:
-        inc r8
-        cmp r8, rdx
+        inc r8d
+        cmp r8d, edx
         jl .row_loop
+
+    add rsp, 8
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbx
 
     pop rbp
     ret

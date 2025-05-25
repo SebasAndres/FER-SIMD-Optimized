@@ -19,9 +19,13 @@ int main() {
         cap >> frame;
         if (frame.empty()) break;
 
-        apply_filter_c(frame);
+        cv::Mat frame_copy;
+        frame.copyTo(frame_copy);
+        apply_filter_asm(frame_copy);
 
-        cv::imshow("Camara", frame);
+        // GaussianBlur(frame, frame, cv::Size(5, 5), 0);
+
+        cv::imshow("Camara", frame_copy);
         cv::waitKey(FRAMES_DELAY);
     }
     return 0;
