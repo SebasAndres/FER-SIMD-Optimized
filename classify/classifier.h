@@ -6,10 +6,10 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
 
-#define PROCESSED_IMG_SIZE 100
+#define PROCESSED_IMG_SIZE 64
 #define VECTOR_LENGTH (PROCESSED_IMG_SIZE * PROCESSED_IMG_SIZE * 3)
 
-const std::string FACE_TYPES[3] = {"Enojado", "Feliz", "Triste"};
+const std::string FACE_TYPES[3] = {"Angry", "Happy", "Sad"};
 
 namespace fs = std::filesystem;
 
@@ -28,8 +28,8 @@ private:
 
     float centroids[3][VECTOR_LENGTH];
 
+    float* vectorize_face(const cv::Mat& face_img);
     std::string run_classification(const float* face_vector);
-    float* preprocess_face(const cv::Mat& face_img);
     void calculate_centroid(std::string dir_path, uint8_t type_index, std::ofstream& analysis_file);
 
     void save_centroids(const std::string& filename);

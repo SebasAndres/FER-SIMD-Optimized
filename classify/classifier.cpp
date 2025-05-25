@@ -30,6 +30,18 @@ void FaceClassifier::train() {
 }
 
 
+float* FaceClassifier::vectorize_face(const cv::Mat& face_img) {
+    float* vector = new float[VECTOR_LENGTH];
+    cv::Mat resized, normalized, flat;
+    cv::resize(face_img, resized, cv::Size(PROCESSED_IMG_SIZE, PROCESSED_IMG_SIZE));
+    resized.convertTo(normalized, CV_32F, 1.0 / 255.0);
+    normalized.reshape(1, 1).copyTo(flat);
+    std::copy(flat.begin<float>(), flat.end<float>(), vector);
+    return vector;
+}
+
+
+
 void FaceClassifier::calculate_centroid(std::string dir_path, uint8_t type_index, std::ofstream& analysis_file){
 
     size_t num_files = std::distance(fs::directory_iterator(dir_path), fs::directory_iterator{});
@@ -96,17 +108,6 @@ bool FaceClassifier::load_centroids(const std::string& filename) {
 void FaceClassifier::detect_faces(const cv::Mat& frame, std::vector<cv::Rect>& faces) {
     cv::cvtColor(frame, gray_frame, cv::COLOR_BGR2GRAY);
     face_detector.detectMultiScale(gray_frame, faces);
-}
-
-
-float* FaceClassifier::vectorize_face(const cv::Mat& face_img) {
-    float* vector = new float[VECTOR_LENGTH];
-    cv::Mat resized, normalized, flat;
-    cv::resize(face_img, resized, cv::Size(PROCESSED_IMG_SIZE, PROCESSED_IMG_SIZE));
-    resized.convertTo(normalized, CV_32F, 1.0 / 255.0);
-    normalized.reshape(1, 1).copyTo(flat);
-    std::copy(flat.begin<float>(), flat.end<float>(), vector);
-    return vector;
 }
 
 
