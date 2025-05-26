@@ -4,10 +4,13 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <vector>
 #include <opencv2/opencv.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/objdetect.hpp>
 
-#define PROCESSED_IMG_SIZE 64
-#define VECTOR_LENGTH (PROCESSED_IMG_SIZE * PROCESSED_IMG_SIZE * 3)
+#define PROCESSED_IMG_SIZE 48
+#define VECTOR_LENGTH 3780
 
 const std::string FACE_TYPES[3] = {"Angry", "Happy", "Sad"};
 
@@ -24,12 +27,9 @@ public:
 
 private:
     cv::CascadeClassifier face_detector;
-    cv::Mat gray_frame;
-
-    float centroids[3][VECTOR_LENGTH];
-
-    float* vectorize_face(const cv::Mat& face_img);
-    std::string run_classification(const float* face_vector);
+ 
+    std::vector<float> vectorize_face(const cv::Mat& face_img);
+    std::string run_classification(std::vector<float> face_vector);
     void calculate_centroid(std::string dir_path, uint8_t type_index, std::ofstream& analysis_file);
 
     void save_centroids(const std::string& filename);

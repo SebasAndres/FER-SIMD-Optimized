@@ -20,7 +20,14 @@ FaceClassifier::~FaceClassifier() {
 void FaceClassifier::train() {
     std::cout << "Training the model...\n";
     std::ofstream analysis_file;
-    analysis_file.open("dataset/vectorized_faces.csv", std::ios::app | std::ios::binary);
+    analysis_file.open("dataset/vectorized_faces.csv", std::ios::trunc | std::ios::binary);
+    analysis_file << "Type,";
+    for (int i = 0; i < VECTOR_LENGTH; ++i) {
+        analysis_file << "Feature_" << i;
+        if (i < VECTOR_LENGTH - 1)
+            analysis_file << ",";
+    }
+    analysis_file << "\n";
     calculate_centroid("dataset/Angry", 0, analysis_file);
     calculate_centroid("dataset/Happy", 1, analysis_file);
     calculate_centroid("dataset/Sad", 2, analysis_file);
@@ -30,19 +37,30 @@ void FaceClassifier::train() {
 }
 
 
-float* FaceClassifier::vectorize_face(const cv::Mat& face_img) {
-    float* vector = new float[VECTOR_LENGTH];
-    cv::Mat resized, normalized, flat;
-    cv::resize(face_img, resized, cv::Size(PROCESSED_IMG_SIZE, PROCESSED_IMG_SIZE));
-    resized.convertTo(normalized, CV_32F, 1.0 / 255.0);
-    normalized.reshape(1, 1).copyTo(flat);
-    std::copy(flat.begin<float>(), flat.end<float>(), vector);
+std::vector<float> FaceClassifier::vectorize_face(const cv::Mat& face_img) {
+    std::vector<float> vector;
+    cv::Mat gray;
+    cvtColor(face_img, gray, cv::COLOR_BGR2GRAY);
+
+    // Use a fixed winSize for HOG to ensure consistent vector size
+    cv::Size winSize(64, 128); 
+    cv::HOGDescriptor hog(winSize, cv::Size(16,16), cv::Size(8,8), cv::Size(8,8), 9);
+
+    if (gray.size() != winSize) {
+        cv::resize(gray, gray, winSize);
+    }
+    hog.compute(gray, vector);
+
     return vector;
 }
 
 
 
-void FaceClassifier::calculate_centroid(std::string dir_path, uint8_t type_index, std::ofstream& analysis_file){
+void FaceClassifier::calculate_centroid(
+    std::string dir_path,
+    uint8_t type_index,
+    std::ofstream& analysis_file
+){
 
     size_t num_files = std::distance(fs::directory_iterator(dir_path), fs::directory_iterator{});
     std::cout << "Calculating centroid for " << dir_path << " with " << num_files << " files\n";
@@ -57,7 +75,7 @@ void FaceClassifier::calculate_centroid(std::string dir_path, uint8_t type_index
         detect_faces(img, faces);
         for (const auto& face : faces) {
             cv::Mat face_img = img(face).clone();
-            float* face_vector_ptr = vectorize_face(face_img);
+            std::vector<float> face_vector_ptr = vectorize_face(face_img);
             analysis_file << FACE_TYPES[type_index] << ",";
             for (int i = 0; i < VECTOR_LENGTH; ++i) {
                 centroids[type_index][i] += face_vector_ptr[i] / num_files;
@@ -66,7 +84,6 @@ void FaceClassifier::calculate_centroid(std::string dir_path, uint8_t type_index
                     analysis_file << ",";
             }
             analysis_file << "\n";
-            delete[] face_vector_ptr;
         }
     }
 }
@@ -106,12 +123,13 @@ bool FaceClassifier::load_centroids(const std::string& filename) {
 
 
 void FaceClassifier::detect_faces(const cv::Mat& frame, std::vector<cv::Rect>& faces) {
+    cv::Mat gray_frame;
     cv::cvtColor(frame, gray_frame, cv::COLOR_BGR2GRAY);
     face_detector.detectMultiScale(gray_frame, faces);
 }
 
 
-float euclidean_distance(const float* a, const float* b) {
+float euclidean_distance(std::vector<float> a, float* b) {
     float sum = 0.0f;
     for (int i = 0; i < VECTOR_LENGTH; ++i) {
         float diff = a[i] - b[i];
@@ -121,7 +139,7 @@ float euclidean_distance(const float* a, const float* b) {
 }
 
 
-std::string FaceClassifier::run_classification(const float* face_vector) {
+std::string FaceClassifier::run_classification(std::vector<float> face_vector) {
     float min_distance = std::numeric_limits<float>::max();
     int min_index = -1;
     for (int i = 0; i < 3; ++i) {
@@ -132,12 +150,11 @@ std::string FaceClassifier::run_classification(const float* face_vector) {
             min_index = i;
         }
     }
-    return FACE_TYPES[min_index];
+    return min_index != -1 ? FACE_TYPES[min_index] : "Unknown";
 }
 
 std::string FaceClassifier::classify_face(const cv::Mat& face_img) {
-    float* face_vector = vectorize_face(face_img);
+    std::vector<float> face_vector = vectorize_face(face_img);
     std::string face_type = run_classification(face_vector);
-    delete[] face_vector;
     return face_type;
 }

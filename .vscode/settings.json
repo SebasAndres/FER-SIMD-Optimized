@@ -67,6 +67,7 @@
         "cinttypes": "c",
         "typeindex": "c",
         "typeinfo": "c",
-        "variant": "c"
+        "variant": "c",
+        "codecvt": "cpp"
     }
 }

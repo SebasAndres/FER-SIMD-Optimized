@@ -1,2 +1,7 @@
 *.o
 *.gdb_history
+
+classify/dataset
+
+*.data 
+*.csv

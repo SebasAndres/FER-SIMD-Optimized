@@ -2,6 +2,7 @@
 #include <opencv2/opencv.hpp>
 #include "classifier.h"
 
+
 #define FONT_LABELS cv::FONT_HERSHEY_SIMPLEX
 #define FONT_SCALE 0.8
 #define FONT_THICKNESS 2
@@ -21,7 +22,6 @@ void test_camara(cv::VideoCapture& cap){
 int main() {
 
     FaceClassifier face_classifier = FaceClassifier();
-
     face_classifier.train();    
 
     cv::VideoCapture cap(0);
@@ -30,7 +30,6 @@ int main() {
     cv::Mat frame; 
     cv::Mat gray;
     std::vector<cv::Rect> faces;
-
 
     while (true) {
 
