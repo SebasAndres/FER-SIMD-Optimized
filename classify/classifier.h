@@ -9,10 +9,14 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/objdetect.hpp>
 
+#include "forest.h"
+
 #define PROCESSED_IMG_SIZE 48
 #define VECTOR_LENGTH 3780
 
 const std::string FACE_TYPES[3] = {"Angry", "Happy", "Sad"};
+
+extern const DecisionTreeNode* const forest[NUM_TREES];
 
 namespace fs = std::filesystem;
 
@@ -27,14 +31,10 @@ public:
 
 private:
     cv::CascadeClassifier face_detector;
- 
+
     std::vector<float> vectorize_face(const cv::Mat& face_img);
     std::string run_classification(std::vector<float> face_vector);
-    void calculate_centroid(std::string dir_path, uint8_t type_index, std::ofstream& analysis_file);
-
-    void save_centroids(const std::string& filename);
-    bool load_centroids(const std::string& filename);
-
+    void insert_dataset(std::string dir_path, uint8_t type_index,std::ofstream& analysis_file);
 };
 
 #endif // CLASSIFIER_H

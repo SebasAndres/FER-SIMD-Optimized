@@ -7,8 +7,6 @@ FaceClassifier::FaceClassifier() {
         std::cerr << "Error al cargar el modelo Haar\n";
         exit(1);
     }
-
-    load_centroids("centroids.dat");
 }
 
 
@@ -28,10 +26,9 @@ void FaceClassifier::train() {
             analysis_file << ",";
     }
     analysis_file << "\n";
-    calculate_centroid("dataset/Angry", 0, analysis_file);
-    calculate_centroid("dataset/Happy", 1, analysis_file);
-    calculate_centroid("dataset/Sad", 2, analysis_file);
-    save_centroids("centroids.dat");
+    insert_dataset("dataset/Angry", 0, analysis_file);
+    insert_dataset("dataset/Happy", 1, analysis_file);
+    insert_dataset("dataset/Sad", 2, analysis_file);
     analysis_file.close();
     std::cout << "Training the model... Done\n";
 }
@@ -55,15 +52,15 @@ std::vector<float> FaceClassifier::vectorize_face(const cv::Mat& face_img) {
 }
 
 
-
-void FaceClassifier::calculate_centroid(
+void FaceClassifier::insert_dataset(
     std::string dir_path,
     uint8_t type_index,
     std::ofstream& analysis_file
 ){
 
+    std::cout << "*Processing directory: " << dir_path << "\n";
+
     size_t num_files = std::distance(fs::directory_iterator(dir_path), fs::directory_iterator{});
-    std::cout << "Calculating centroid for " << dir_path << " with " << num_files << " files\n";
     for (const auto& entry : fs::directory_iterator(dir_path)) {
         std::string file_path = entry.path().string();
         cv::Mat img = cv::imread(file_path);
@@ -78,7 +75,6 @@ void FaceClassifier::calculate_centroid(
             std::vector<float> face_vector_ptr = vectorize_face(face_img);
             analysis_file << FACE_TYPES[type_index] << ",";
             for (int i = 0; i < VECTOR_LENGTH; ++i) {
-                centroids[type_index][i] += face_vector_ptr[i] / num_files;
                 analysis_file << face_vector_ptr[i];
                 if (i < VECTOR_LENGTH - 1)
                     analysis_file << ",";
@@ -89,39 +85,6 @@ void FaceClassifier::calculate_centroid(
 }
 
 
-void FaceClassifier::save_centroids(const std::string& filename) {
-    std::ofstream file(filename, std::ios::out | std::ios::binary);
-    if (!file) {
-        std::cerr << "No se pudo abrir el archivo para guardar.\n";
-        return;
-    }
-    for (int c = 0; c < 3; ++c) {
-        file.write(reinterpret_cast<const char*>(centroids[c]), VECTOR_LENGTH * sizeof(float));
-    }
-    file.close();
-    std::cout << "Centroides guardados en: " << filename << "\n";
-}
-
-
-bool FaceClassifier::load_centroids(const std::string& filename) {
-    std::ifstream file(filename, std::ios::in | std::ios::binary);
-    if (!file) {
-        std::cerr << "No se pudo abrir el archivo para cargar.\n";
-        return false;
-    }
-    for (int c = 0; c < 3; ++c) {
-        file.read(reinterpret_cast<char*>(centroids[c]), VECTOR_LENGTH * sizeof(float));
-        if (!file) {
-            std::cerr << "Error leyendo el archivo.\n";
-            return false;
-        }
-    }
-    file.close();
-    std::cout << "Centroides cargados desde: " << filename << "\n";
-    return true;
-}
-
-
 void FaceClassifier::detect_faces(const cv::Mat& frame, std::vector<cv::Rect>& faces) {
     cv::Mat gray_frame;
     cv::cvtColor(frame, gray_frame, cv::COLOR_BGR2GRAY);
@@ -129,29 +92,41 @@ void FaceClassifier::detect_faces(const cv::Mat& frame, std::vector<cv::Rect>& f
 }
 
 
-float euclidean_distance(std::vector<float> a, float* b) {
-    float sum = 0.0f;
-    for (int i = 0; i < VECTOR_LENGTH; ++i) {
-        float diff = a[i] - b[i];
-        sum += diff * diff;
+int predict_tree(int tree_idx, std::vector<float> features) {
+    int node = 0;
+    while (1) {
+        if (forest[tree_idx][node].left == -1 &&
+            forest[tree_idx][node].right == -1) {
+            return forest[tree_idx][node].value;
+        }
+        if (features[forest[tree_idx][node].feature_index] <= forest[tree_idx][node].threshold) {
+            node = forest[tree_idx][node].left;
+        } else {
+            node = forest[tree_idx][node].right;
+        }
     }
-    return std::sqrt(sum);
 }
 
 
 std::string FaceClassifier::run_classification(std::vector<float> face_vector) {
-    float min_distance = std::numeric_limits<float>::max();
-    int min_index = -1;
-    for (int i = 0; i < 3; ++i) {
-        float distance = euclidean_distance(face_vector, centroids[i]);
-        std::cout << "Distance to " << FACE_TYPES[i] << ": " << distance << "\n";
-        if (distance < min_distance) {
-            min_distance = distance;
-            min_index = i;
-        }
+    int votes[3] = {0}; 
+    for (int t = 0; t < NUM_TREES; ++t) {
+        int predicted_class = predict_tree(t, face_vector);
+        votes[predicted_class]++;
     }
-    return min_index != -1 ? FACE_TYPES[min_index] : "Unknown";
+    int max_votes = -1;
+    int predicted_class = -1;
+    for (int c = 0; c < 3; ++c) {
+        if (votes[c] > max_votes) {
+            max_votes = votes[c];
+            predicted_class = c;
+        }
+        std::cout << FACE_TYPES[c] << ": " << votes[c] << " ";
+    }
+    std::cout << "\n";
+    return FACE_TYPES[predicted_class];
 }
+
 
 std::string FaceClassifier::classify_face(const cv::Mat& face_img) {
     std::vector<float> face_vector = vectorize_face(face_img);

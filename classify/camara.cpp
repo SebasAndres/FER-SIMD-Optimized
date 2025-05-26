@@ -22,7 +22,6 @@ void test_camara(cv::VideoCapture& cap){
 int main() {
 
     FaceClassifier face_classifier = FaceClassifier();
-    face_classifier.train();    
 
     cv::VideoCapture cap(0);
     test_camara(cap);

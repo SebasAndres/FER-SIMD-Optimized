@@ -15,8 +15,12 @@ test: test.c
 main: main.cpp 
 	$(CXX) $(CAMARA_CXXFLAGS) main.cpp -o main $(CAMARA_LDFLAGS)
 
-camara: camara.cpp classifier.cpp
-	$(CXX) $(CAMARA_CXXFLAGS) camara.cpp classifier.cpp -o camara $(CAMARA_LDFLAGS)
+generate: generate_dataset.cpp classifier.cpp forest.cpp
+	$(CXX) $(CAMARA_CXXFLAGS) generate_dataset.cpp classifier.cpp forest.cpp -o generate_dataset $(CAMARA_LDFLAGS)
+	./generate_dataset
+
+camara: camara.cpp classifier.cpp forest.cpp
+	$(CXX) $(CAMARA_CXXFLAGS) camara.cpp classifier.cpp forest.cpp -o camara $(CAMARA_LDFLAGS)
 
 run: camara
 	./camara

@@ -3,5 +3,5 @@
 
 classify/dataset
 
-*.data 
+*.dat
 *.csv
