@@ -25,16 +25,24 @@ public:
     FaceClassifier();
     ~FaceClassifier();
 
-    void detect_faces(const cv::Mat& gray_frame, std::vector<cv::Rect>& faces);
-    std::string classify_face(const cv::Mat& face_img);
-    void train();
+    void detectFaces(const cv::Mat& gray_frame, std::vector<cv::Rect>& faces);
+    std::string classifyFace(const cv::Mat& face_img);
+    void vectorizeDataset(
+        std::string vectorized_dataset_path = "dataset/vectorized_faces.csv",
+        std::string original_dataset_path = "dataset/og/"
+    );
 
 private:
     cv::CascadeClassifier face_detector;
 
-    std::vector<float> vectorize_face(const cv::Mat& face_img);
-    std::string run_classification(std::vector<float> face_vector);
-    void insert_dataset(std::string dir_path, uint8_t type_index,std::ofstream& analysis_file);
+    std::vector<float> vectorizeFace(const cv::Mat& face_img);
+    std::string runClassification(std::vector<float> face_vector);
+    void processFolder(std::string dir_path, uint8_t type_index,std::ofstream& analysis_file);
+
+    void saveFace(const cv::Mat& face_img, uint8_t type_index);
+    void saveVectorIntoCsv(
+        const std::vector<float>& face_vector, uint8_t type_index, std::ofstream& analysis_file
+    );
 };
 
 #endif // CLASSIFIER_H

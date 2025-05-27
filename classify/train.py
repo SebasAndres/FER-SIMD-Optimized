@@ -2,10 +2,15 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from imblearn.over_sampling import SMOTE
 
 from collections import Counter
 
-def export_model():
+N_ESTIMATORS = 150
+MAX_DEPTH = 10
+
+def export_model(model):
     with open("forest.cpp", "w") as f:
         f.write("#include \"forest.h\"\n\n")
         for tree_idx, estimator in enumerate(model.estimators_):
@@ -36,35 +41,52 @@ def export_model():
             f.write(f"    forest_{tree_idx},\n")
         f.write("};\n")
 
-
-
 if __name__ == "__main__":
 
     # Load dataset
     dataset = pd.read_csv('dataset/vectorized_faces.csv')
-
-    # Separate features and target
     X = dataset.drop(columns=['Type'])
-    y = dataset['Type']
+    Y = dataset['Type']
+    print(f"Dataset shape: {X.shape}, Number of classes: {len(Y.unique())}")
 
+    # Balance dataset
+    print("[1] Balancing dataset using SMOTE...")
+    smote = SMOTE(random_state=42)
+    x_resampled, y_resampled = smote.fit_resample(X, Y)
+    print(f"> Original dataset shape: {Counter(Y)}")
+    print(f"> Resampled dataset shape: {Counter(y_resampled)}")
 
-    # Split into train and test sets with stratification
+    # Encode labels
+    print("[2] Encoding labels...")
+    le = LabelEncoder()
+    y_balanced = le.fit_transform(y_resampled)
+
+    # Split dataset
+    print("[3] Splitting dataset into training and testing sets...")
     x_train, x_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
+        x_resampled,
+        y_resampled,
+        test_size=0.2, 
+        random_state=42
     )
+    print(f"> Train shape: {x_train.shape}, Test shape: {x_test.shape}")
 
-    print(Counter(y_train))
-
-    # Initialize RandomForest with reproducibility and reasonable defaults
+    # Train model
+    print("[4] Training Random Forest Classifier...")
+    print(f"> Number of estimators: {N_ESTIMATORS}, Max depth: {MAX_DEPTH}")   
     model = RandomForestClassifier(
-        n_estimators=150,
-        random_state=42,
-        n_jobs=-1,
+        n_estimators=N_ESTIMATORS,
+        max_depth=MAX_DEPTH,
+        random_state=1, 
         class_weight='balanced'
     )
     model.fit(x_train, y_train)
-    
-    score = model.score(x_test, y_test)
-    print(f"Model accuracy: {score * 100:.2f}%")
 
-    export_model()
+    # Evaluate model
+    print("[5] Evaluating model...")
+    score  = model.score(x_test, y_test)
+    print(f"> Model accuracy: {score:.2f}")
+
+    # Export model
+    print("[6] Exporting model to C++ code...")
+    export_model(model)
