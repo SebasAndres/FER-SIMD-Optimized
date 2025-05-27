@@ -130,7 +130,7 @@ void FaceClassifier::saveFace(const cv::Mat& face_img, uint8_t type_index) {
     if (!fs::exists(output_folder)) {
         fs::create_directories(output_folder);
     }
-    std::string output_file = output_folder + "face_" + std::to_string(face_id++) + ".jpg";
+    std::string output_file = output_folder + "face_" + std::to_string(face_id++) + "_.jpg";
     cv::imwrite(output_file, face_img);
 }
 
