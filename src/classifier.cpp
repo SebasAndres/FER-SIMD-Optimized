@@ -175,7 +175,7 @@ void FaceClassifier::detectFaces(const cv::Mat& frame, std::vector<cv::Rect>& fa
 }
 
 
-int predict_tree(int tree_idx, std::vector<float> features) {
+int predictTree(int tree_idx, std::vector<float> features) {
     /*
     This function predicts the class of a face using a decision tree from the forest.
     Parameters:
@@ -215,7 +215,7 @@ std::string FaceClassifier::runClassification(std::vector<float> face_vector) {
 
     int votes[3] = {0}; 
     for (int t = 0; t < NUM_TREES; ++t) {
-        int predicted_class = predict_tree(t, face_vector);
+        int predicted_class = predictTree(t, face_vector);
         votes[predicted_class]++;
     }
     int max_votes = -1;
