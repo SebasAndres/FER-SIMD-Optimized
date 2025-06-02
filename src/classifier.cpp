@@ -2,14 +2,59 @@
 
 
 FaceClassifier::FaceClassifier() {
+    // TODO: Deprecar
     if (!face_detector.load("haarcascade_frontalface_default.xml")) {
         std::cerr << "Error al cargar el modelo Haar\n";
         exit(1);
     }
+
+    loadFaceVectors();    
 }
 
 
 FaceClassifier::~FaceClassifier() {
+}
+
+void FaceClassifier::loadFaceVectors() {
+    /*
+    This function loads the face vectors from the dataset into the face_vectors vector.
+    It initializes the face_vectors vector with the data from the dataset.
+    */
+   
+    std::ifstream file("dataset/vectorized_faces.csv");
+    if (!file.is_open()) {
+        std::cerr << "Error al abrir el archivo de dataset\n";
+        exit(1);
+    }
+
+    std::string line;
+    int line_number = 0;
+    while (std::getline(file, line)) {
+        if (line_number == 0) { // Skip header
+            line_number++;
+            continue;
+        }        
+        std::stringstream ss(line);
+        int type;
+        std::vector<float> vector(VECTOR_LENGTH);
+        
+        // Read type
+        ss >> type;
+
+        // Read vector values
+        for (int i = 0; i < VECTOR_LENGTH; ++i) {
+            std::string value;
+            std::getline(ss, value, ',');
+            vector[i] = std::stof(value);
+        }
+
+        // Store the case
+        FaceNode face_case;
+        face_case.type = type;
+        face_case.vector = vector;
+        FACE_NODES.push_back(face_case);
+        line_number++;
+    }
 }
 
 
@@ -149,7 +194,7 @@ void FaceClassifier::saveVectorIntoCsv(
     - analysis_file: An output file stream to write the vectorized face data.
     */
 
-    analysis_file << FACE_TYPES[type_index] << ",";
+    analysis_file << type_index << ",";
     for (int i = 0; i < VECTOR_LENGTH; ++i) {
         analysis_file << face_vector[i];
         if (i < VECTOR_LENGTH - 1)
@@ -175,36 +220,31 @@ void FaceClassifier::detectFaces(const cv::Mat& frame, std::vector<cv::Rect>& fa
 }
 
 
-int predictTree(int tree_idx, std::vector<float> features) {
+float FaceClassifier::computeDistance(
+    const std::vector<float>& face_vector1, 
+    const std::vector<float>& face_vector2
+) {
     /*
-    This function predicts the class of a face using a decision tree from the forest.
+    This function computes the Euclidean distance between two face vectors.
     Parameters:
-    - tree_idx: The index of the decision tree to use for prediction.
-    - features: A vector of features extracted from the face image.
+    - face_vector1: The first face vector.
+    - face_vector2: The second face vector.
     Returns:
-    - The predicted class index (0 for Angry, 1 for Happy, 2 for Sad).
+    - The Euclidean distance between the two vectors.
     */
-
-    int node = 0;
-    while (1) {
-        if (forest[tree_idx][node].left == -1 &&
-            forest[tree_idx][node].right == -1) {
-            return forest[tree_idx][node].value;
-        }
-        if (features[forest[tree_idx][node].feature_index] <= forest[tree_idx][node].threshold) {
-            node = forest[tree_idx][node].left;
-        } else {
-            node = forest[tree_idx][node].right;
-        }
+    
+    float distance = 0.0f;
+    for (size_t i = 0; i < VECTOR_LENGTH; ++i) {
+        float diff = face_vector1[i] - face_vector2[i];
+        distance += diff * diff;
     }
+    return std::sqrt(distance);
 }
 
 
 std::string FaceClassifier::runClassification(std::vector<float> face_vector) {
     /*
-    This function runs the classification of a face vector using an ensemble of decision trees.
-    It aggregates the votes from each tree and returns the predicted face type.
-
+    This function runs the classification of a face vector using the KNN algorithm.
     This could run parallel to speed up the classification process using SIMD.
 
     Parameters:
@@ -213,22 +253,42 @@ std::string FaceClassifier::runClassification(std::vector<float> face_vector) {
     - The predicted face type as a string.
     */
 
-    int votes[3] = {0}; 
-    for (int t = 0; t < NUM_TREES; ++t) {
-        int predicted_class = predictTree(t, face_vector);
-        votes[predicted_class]++;
-    }
-    int max_votes = -1;
-    int predicted_class = -1;
-    for (int c = 0; c < 3; ++c) {
-        if (votes[c] > max_votes) {
-            max_votes = votes[c];
-            predicted_class = c;
+    struct Compare2nd {
+        bool operator()(const std::pair<float, FaceNode>& a, const std::pair<float, FaceNode>& b) {
+            return a.first > b.first; // Min-heap based on distance
         }
-        std::cout << FACE_TYPES[c] << ": " << votes[c] << " ";
+    };
+
+    uint16_t face_type_counter[3] = {0,0,0};
+    std::priority_queue<std::pair<float, FaceNode>, std::vector<std::pair<float, FaceNode>>, Compare2nd> minHeapNodes;
+
+    // Build a min-heap to store the distances
+    // This could be easily parallelized using SIMD
+    for (int i = 0; i < NUM_FACE_NODES; ++i) {
+        float distance = this->computeDistance(face_vector, FACE_NODES[i].vector);
+        minHeapNodes.push({distance, FACE_NODES[i]});
     }
-    std::cout << "\n";
-    return FACE_TYPES[predicted_class];
+
+    // Get top K neighbors and its face-types
+    // Then sum the face-types to determine the final classification
+    for (int j=0; j < K; ++j) {        
+        // Extract minimum distance node
+        FaceNode node = minHeapNodes.top().second;
+        minHeapNodes.pop();
+
+        // Increment the counter for the face type
+        face_type_counter[node.type]++;
+    }
+
+    // Get index of the maximum face type counter
+    int max_index = 0;
+    for (int i = 1; i < 3; ++i) {
+        if (face_type_counter[i] > face_type_counter[max_index]) {
+            max_index = i;
+        }
+    }
+
+    return FACE_TYPES[max_index];
 }
 
 

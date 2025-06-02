@@ -5,20 +5,22 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <queue>
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/objdetect.hpp>
-
-#include "forest.h"
 
 #define PROCESSED_IMG_SIZE 48
 #define VECTOR_LENGTH 3780
 
 const std::string FACE_TYPES[3] = {"Angry", "Happy", "Sad"};
 
-extern const DecisionTreeNode* const forest[NUM_TREES];
-
 namespace fs = std::filesystem;
+
+struct FaceNode {
+    int type;
+    std::vector<float> vector;
+};
 
 class FaceClassifier {
 public:
@@ -34,11 +36,18 @@ public:
 
 private:
     cv::CascadeClassifier face_detector;
+    std::vector<FaceNode> FACE_NODES;
+    const int NUM_FACE_NODES = 1000; 
+    const int K = 5; 
 
     std::vector<float> vectorizeFace(const cv::Mat& face_img);
     std::string runClassification(std::vector<float> face_vector);
-    void processFolder(std::string dir_path, uint8_t type_index,std::ofstream& analysis_file);
 
+    
+    void processFolder(std::string dir_path, uint8_t type_index,std::ofstream& analysis_file);
+    float computeDistance(const std::vector<float>& face_vector1, const std::vector<float>& face_vector2);
+    
+    void loadFaceVectors();
     void saveFace(const cv::Mat& face_img, uint8_t type_index);
     void saveVectorIntoCsv(
         const std::vector<float>& face_vector, uint8_t type_index, std::ofstream& analysis_file
