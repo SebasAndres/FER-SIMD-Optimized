@@ -1,7 +1,7 @@
 *.o
 *.gdb_history
 
-classify/dataset
+src/dataset/*
 
 *.dat
 *.csv
