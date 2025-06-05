@@ -25,11 +25,12 @@ std::vector<float> FaceClassifier::vectorizeFace(const cv::Mat& face_img) {
     std::vector<float> vector;
 
     // Resize the image to a fixed size
-    cv::resize(face_img, face_img, cv::Size(PROCESSED_IMG_SIZE, PROCESSED_IMG_SIZE));
+    cv::Mat resized_face;
+    cv::resize(face_img, resized_face, cv::Size(PROCESSED_IMG_SIZE, PROCESSED_IMG_SIZE));
 
     // Convert the image to grayscale (if it's not already)
     cv::Mat bn_face;
-    cvtColor(face_img, bn_face, cv::COLOR_BGR2GRAY);
+    cvtColor(resized_face, bn_face, cv::COLOR_BGR2GRAY);
 
     // Extract features    
 
