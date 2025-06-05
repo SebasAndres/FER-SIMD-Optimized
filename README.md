@@ -4,6 +4,7 @@
 Mi idea es implementar un sistema de Face Emotion Recognition (FER) optimizado con SIMD que detecte en tiempo real caras y las clasifique según su estado de ánimo (feliz, triste, enojado, neutral, etcétera). El entregable sería un proyecto el cual vos al correrlo te prende la cámara de la computadora y ves cómo clasifica todas las caras que aparezcan.
 
 Como contexto, el trabajo en FER tiene 3 etapas principales:
+
 > [1] Detección de caras en las imágenes.
 > [2] Extracción de features de las caras.
 > [3] Algoritmo de clasificación.
@@ -15,7 +16,7 @@ Como contexto, el trabajo en FER tiene 3 etapas principales:
 [3] Clasificación de caras: El approach inicial, y vi en los papers que es muy usado, va a ser con KNN. Sería computar la matriz de distancias entre vectores y hacer la inferencia de forma optimizada con SIMD.
 
 
-### Bibliografía
+### Docs
 * [Haar Features - Viola & Jones Algorithm](https://www.merl.com/publications/docs/TR2004-043.pdf)
 * [Facial expression recognition techniques](https://ietresearch.onlinelibrary.wiley.com/doi/epdf/10.1049/iet-ipr.2018.6647)
 * [LBP](https://link.springer.com/chapter/10.1007/978-3-540-24670-1_36)
