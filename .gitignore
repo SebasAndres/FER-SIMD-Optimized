@@ -3,6 +3,7 @@
 
 src/dataset/*
 src/.vscode/*
+test_camara_filter/*
 
 *.dat
 *.csv
