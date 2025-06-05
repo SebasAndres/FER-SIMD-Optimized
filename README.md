@@ -1,14 +1,21 @@
 # Optimized Facial Expression Recognition with SIMD
 
 ### Abstract 
+Mi idea es implementar un sistema de Face Emotion Recognition (FER) optimizado con SIMD que detecte en tiempo real caras y las clasifique según su estado de ánimo (feliz, triste, enojado, neutral, etcétera). El entregable sería un proyecto el cual vos al correrlo te prende la cámara de la computadora y ves cómo clasifica todas las caras que aparezcan.
 
+Como contexto, el trabajo en FER tiene 3 etapas principales:
+> [1] Detección de caras en las imágenes.
+> [2] Extracción de features de las caras.
+> [3] Algoritmo de clasificación.
 
-### Flujo del programa
-<img src='docs/flujo.png' width=300 height=300>
+[1] Detección de caras en las imágenes: Para la primera parte, la idea es implementarlo con Haar Features. Aunque no profundicé demasiado esta implementación todavía (estoy usando  un modelo Haar entrenado para testear) el cálculo de estos features se hace con promedios de intensidades de píxeles, algo que es completamente realizable con SIMD.
+
+[2] Extracción de features de las caras. Una vez recortada la imagen de la cara, para vectorizar esos píxeles puedo usar Principal Component Analysis (PCA) o Local Binary Patterns (LBP). Por un lado, PCA es una técnica que estoy viendo en la materia ALC y sé que se usó en proyectos finales anteriores, entonces es algo realizable. LBP, es otra técnica que se menciona en los papers ya que es un poco mejor computacionalmente y no la vi implementada en otro lado. Podría probar cuál da mejores resultados.
+
+[3] Clasificación de caras: El approach inicial, y vi en los papers que es muy usado, va a ser con KNN. Sería computar la matriz de distancias entre vectores y hacer la inferencia de forma optimizada con SIMD.
 
 
 ### Bibliografía
 * [Haar Features - Viola & Jones Algorithm](https://www.merl.com/publications/docs/TR2004-043.pdf)
 * [Facial expression recognition techniques](https://ietresearch.onlinelibrary.wiley.com/doi/epdf/10.1049/iet-ipr.2018.6647)
-* [Gabor Wavelets](https://www.researchgate.net/profile/Michael-Lyons-9/publication/3745235_Coding_Facial_Expressions_with_Gabor_Wavelets/links/57982a2108aec89db7b9b4c7/Coding-Facial-Expressions-with-Gabor-Wavelets.pdf?origin=publication_detail&_tp=eyJjb250ZXh0Ijp7ImZpcnN0UGFnZSI6InB1YmxpY2F0aW9uIiwicGFnZSI6InB1YmxpY2F0aW9uRG93bmxvYWQiLCJwcmV2aW91c1BhZ2UiOiJwdWJsaWNhdGlvbiJ9fQ&__cf_chl_rt_tk=ZHaaJyMRY.8MLT2Lo3eb6tq6UqDFzzQCnYiEfOMQQzc-1749096409-1.0.1.1-oARku9Nhhb7ZY9b0LglbOWEQCmUcKLAO0C_Mm2m6wzI)
 * [LBP](https://link.springer.com/chapter/10.1007/978-3-540-24670-1_36)
