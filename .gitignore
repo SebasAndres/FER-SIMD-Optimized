@@ -1,7 +1,9 @@
 *.o
 *.gdb_history
 
-classify/dataset
+src/dataset/*
+src/.vscode/*
+test_camara_filter/*
 
-*.data 
+*.dat
 *.csv

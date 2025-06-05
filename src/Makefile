@@ -9,20 +9,30 @@ CFLAGS= -Wall -Wextra -pedantic -Og -g -Wno-unused-variable -Wno-unused-paramete
 CAMARA_CXXFLAGS = `pkg-config --cflags opencv4` -std=c++17 $(CFLAGS)
 CAMARA_LDFLAGS = `pkg-config --libs opencv4`
 
-test: test.c 
-	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+download_dataset: 
+	python download_dataset.py
 
-main: main.cpp 
-	$(CXX) $(CAMARA_CXXFLAGS) main.cpp -o main $(CAMARA_LDFLAGS)
+generate: generate.cpp classifier.cpp
+	$(CXX) $(CAMARA_CXXFLAGS) generate.cpp classifier.cpp -o generate_points $(CAMARA_LDFLAGS)
+	./generate_points
 
 camara: camara.cpp classifier.cpp
 	$(CXX) $(CAMARA_CXXFLAGS) camara.cpp classifier.cpp -o camara $(CAMARA_LDFLAGS)
-
+ 
 run: camara
 	./camara
 
+pipeline:
+	@echo "Iniciando pipeline..."
+	make clean
+	make download_dataset
+	make generate
+	make camara
+	make run
+	@echo "Pipeline completado."
+
 clean:
-	rm -f test main camara
+	rm -f camara generate_points
 	@echo "Clean completado."
 
 .PHONY: test

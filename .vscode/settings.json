@@ -68,6 +68,7 @@
         "typeindex": "c",
         "typeinfo": "c",
         "variant": "c",
-        "codecvt": "cpp"
+        "codecvt": "cpp",
+        "forest.c": "cpp"
     }
 }
