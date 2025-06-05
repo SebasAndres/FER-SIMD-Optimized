@@ -6,5 +6,8 @@ src/.vscode/*
 test_camara_filter/*
 .vscode/
 
+src/camara 
+src/generate_points
+
 *.dat
 *.csv
