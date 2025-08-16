@@ -8,9 +8,10 @@ test_camara_filter/*
 .vscode/
 
 poetry.lock
+.python-version
 
 src/camara 
-src/generate
+src/initialize_vectorizer
 
 *.dat
 *.csv
