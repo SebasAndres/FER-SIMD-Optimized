@@ -1,13 +1,85 @@
 #include "classifier.h"
 
-
 FaceClassifier::FaceClassifier() {
-    if (!face_detector.load("haarcascade_frontalface_default.xml")) {
-        std::cerr << "Error al cargar el modelo Haar\n";
+    if (!face_detector.load("face_detection/haarcascade_frontalface_default.xml")) {
+        std::cerr << "Error loading Haar\n";
         exit(1);
+    }
+
+    // load mean vector
+    std::ifstream mean_file("dataset/mean_vector.csv");
+    if (!mean_file.is_open()) {
+        std::cout << "Could not load mean vector file\n";
+    }
+    else {
+        std::string line;
+        std::getline(mean_file, line);
+        std::stringstream ss(line);
+        std::string value;
+        while (std::getline(ss, value, ',')) {
+            meanVector.push_back(std::stof(value));
+        }
+        mean_file.close();
+    }
+
+    // load PCA basis
+    std::ifstream pca_file("data/pca_basis.csv");
+    if (!pca_file.is_open()) {
+        std::cout << "Could not load PCA basis\n";
+    } else {
+        // load matrix
+        std::string line;
+        while (std::getline(pca_file, line)) {
+            std::vector<float> pca_vector;
+            std::stringstream ss(line);
+            std::string value;
+            while (std::getline(ss, value, ',')) {
+                pca_vector.push_back(std::stof(value));
+            }
+            pcaBasis.push_back(pca_vector);
+        }
+
+        // calculate mean vectors (centroids) for each category
+        std::string pca_faces_dir = "data/pca_faces";
+        for (const auto& entry : fs::directory_iterator(pca_faces_dir)) {
+            if (entry.is_directory()) {
+                std::string name = entry.path().filename().string();
+                std::string file = pca_faces_dir + "/" + name + "_pca_faces.csv";           
+
+                std::vector<std::vector<float>> vectors = loadVectorsFromCsv(file);
+                std::vector<float> category_mean_vector = calculateMeanVector(vectors);
+                categories_mean_vector[name] = category_mean_vector;
+            }
+        }
     }
 }
 
+std::vector<std::vector<float>> FaceClassifier::loadVectorsFromCsv(const std::string& file_path) {
+    /*
+    This function loads vectors from a CSV file.
+    Parameters:
+    - file_path: The path to the CSV file containing vectors.
+    
+    Returns:
+    - A vector of vectors representing the loaded data.
+    */
+
+    std::vector<std::vector<float>> vectors;
+    std::ifstream file(file_path);
+
+    std::string line;
+    while (std::getline(file, line)) {
+        std::vector<float> vector;
+        std::stringstream ss(line);
+        std::string value;
+        while (std::getline(ss, value, ',')) {
+            vector.push_back(std::stof(value));
+        }
+        vectors.push_back(vector);
+    }
+
+    return vectors;
+}
 
 FaceClassifier::~FaceClassifier() {
 }
@@ -22,19 +94,24 @@ std::vector<float> FaceClassifier::vectorizeFace(const cv::Mat& face_img) {
     - face_img: The input face image in BGR format.
     */
 
-    std::vector<float> vector;
-
-    // Resize the image to a fixed size
+    // [1] Resize the image to a fixed size
     cv::Mat resized_face;
     cv::resize(face_img, resized_face, cv::Size(PROCESSED_IMG_SIZE, PROCESSED_IMG_SIZE));
 
-    // Convert the image to grayscale (if it's not already)
+    // [2] Convert the image to grayscale (if it's not already)
     cv::Mat bn_face;
     cvtColor(resized_face, bn_face, cv::COLOR_BGR2GRAY);
 
-    // Extract features    
+    // [3] Plain image into 1D vector
+    std::vector<float> vector = projectInto1D(bn_face);
 
-    return vector;
+    // [4] Substract the means    
+    std::vector<float> vector_normalized = centerVector(vector, this->meanVector); 
+
+    // [5] Project vector into PCA space
+    std::vector<float> result = projectIntoPCA(vector, this->pcaBasis);
+
+    return result;
 }
 
 
@@ -44,34 +121,11 @@ void FaceClassifier::detectFaces(const cv::Mat& frame, std::vector<cv::Rect>& fa
     It converts the frame to grayscale and applies the face detection algorithm.
 
     Parameters:
-    - frame: The input image frame in BGR format.
+    - frame: The input image frame in BN format.
     - faces: A vector to store the detected face rectangles.
     */
-    cv::Mat gray_frame;
-    cv::cvtColor(frame, gray_frame, cv::COLOR_BGR2GRAY);
-    face_detector.detectMultiScale(gray_frame, faces);
-}
 
-
-float FaceClassifier::computeDistance(
-    const std::vector<float>& face_vector1, 
-    const std::vector<float>& face_vector2
-) {
-    /*
-    This function computes the Euclidean distance between two face vectors.
-    Parameters:
-    - face_vector1: The first face vector.
-    - face_vector2: The second face vector.
-    Returns:
-    - The Euclidean distance between the two vectors.
-    */
-    
-    float distance = 0.0f;
-    for (size_t i = 0; i < VECTOR_LENGTH; ++i) {
-        float diff = face_vector1[i] - face_vector2[i];
-        distance += diff * diff;
-    }
-    return std::sqrt(distance);
+    face_detector.detectMultiScale(frame, faces);
 }
 
 
@@ -85,7 +139,8 @@ std::string FaceClassifier::runClassification(std::vector<float> face_vector) {
     Returns:
     - The predicted face type as a string.
     */
-    return "Happy";
+
+    return "happy";
 }
 
 

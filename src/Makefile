@@ -1,4 +1,3 @@
-
 CXX = g++
 
 AS = nasm
@@ -12,27 +11,26 @@ CAMARA_LDFLAGS = `pkg-config --libs opencv4`
 download_dataset: 
 	python download_dataset.py
 
-generate: generate.cpp classifier.cpp
-	$(CXX) $(CAMARA_CXXFLAGS) generate.cpp classifier.cpp -o generate_points $(CAMARA_LDFLAGS)
-	./generate_points
+initialize_vectorizer: initialize_vectorizer.cpp classifier.cpp linalg.cpp
+	$(CXX) $(CAMARA_CXXFLAGS) initialize_vectorizer.cpp classifier.cpp linalg.cpp -o initialize_vectorizer $(CAMARA_LDFLAGS)
 
-camara: camara.cpp classifier.cpp
-	$(CXX) $(CAMARA_CXXFLAGS) camara.cpp classifier.cpp -o camara $(CAMARA_LDFLAGS)
- 
-run: camara
-	./camara
+application: application.cpp classifier.cpp linalg.cpp
+	$(CXX) $(CAMARA_CXXFLAGS) application.cpp classifier.cpp linalg.cpp -o application $(CAMARA_LDFLAGS)
+
+run_application: application
+	./application
 
 pipeline:
 	@echo "Iniciando pipeline..."
 	make clean
 	make download_dataset
-	make generate
-	make camara
+	make initialize_vectorizer
+	make application
 	make run
 	@echo "Pipeline completado."
 
 clean:
-	rm -f camara generate_points
+	rm -f camara generate
 	@echo "Clean completado."
 
 .PHONY: test

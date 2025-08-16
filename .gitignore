@@ -2,12 +2,17 @@
 *.gdb_history
 
 src/dataset/*
+src/data/*
 src/.vscode/*
 test_camara_filter/*
 .vscode/
 
+poetry.lock
+
 src/camara 
-src/generate_points
+src/generate
 
 *.dat
 *.csv
+
+src/aoc_final.eff-info

@@ -10,8 +10,9 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/objdetect.hpp>
 
+#include "linalg.h"
+
 #define PROCESSED_IMG_SIZE 48
-#define VECTOR_LENGTH 3780
 
 namespace fs = std::filesystem;
 
@@ -30,13 +31,13 @@ public:
     std::vector<float> vectorizeFace(const cv::Mat& face_img);    
     
 private:
-    cv::CascadeClassifier face_detector;
-  
-    float computeDistance(
-        const std::vector<float>& face_vector1, 
-        const std::vector<float>& face_vector2
-    );
+    cv::CascadeClassifier face_detector;  
+    std::vector<float> meanVector;
+    std::vector<std::vector<float>> pcaBasis;
+
+    
     std::string runClassification(std::vector<float> face_vector);    
+    std::vector<std::vector<float>> loadVectorsFromCsv(const std::string& file_path);
 };
 
 #endif // CLASSIFIER_H

@@ -42,35 +42,7 @@ def download_fer2013_dataset():
             pbar.update(1)
 
 
-def download_hugging_face_dataset():
-    """
-    Downloads the Happy or Sad dataset from Hugging Face and converts it to PNG format.
-    """
-    df = pl.read_parquet(
-        'hf://datasets/skyarff/happyOrSad/data/train-00000-of-00001-8f51f85256c856e5.parquet'
-    )
-    output_dir = 'dataset/hugging_face/'
-    os.makedirs(output_dir, exist_ok=True)
-    with tqdm(total=len(df), desc='Converting dataset to PNG format') as pbar:
-        for idx, row in enumerate(df.iter_rows(named=True)):
-
-            # Extract image bytes and label
-            img_bytes = row['image']['bytes']
-            label = row['label'] # <-- 'happiness' or 'sadness'
-
-            # Convert bytes to an image
-            img = Image.open(io.BytesIO(img_bytes))
-            label_dir = os.path.join(output_dir, label)
-
-            # Create label directory if it doesn't exist
-            os.makedirs(label_dir, exist_ok=True)
-            img.save(os.path.join(label_dir, f'{idx}.png'))    
-
-            pbar.update(1)
-
-
 if __name__ == "__main__":
-    print("> Downloading datasets...")
-    # download_hugging_face_dataset()
+    print("> Downloading dataset...")
     download_fer2013_dataset()
     print("> Download complete.")
