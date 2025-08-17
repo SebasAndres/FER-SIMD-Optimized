@@ -11,4 +11,5 @@ dependencies = [
     "scikit-image>=0.25.2",
     "scikit-learn>=1.7.1",
     "tensorflow>=2.20.0",
+    "tqdm>=4.67.1",
 ]

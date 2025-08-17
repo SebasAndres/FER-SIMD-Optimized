@@ -1,6 +1,7 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
-#include "classifier.h"
+#include "face_classifier.h"
+#include "classifiers/classifier.h"
 
 #define FONT_LABELS cv::FONT_HERSHEY_SIMPLEX
 #define FONT_SCALE 0.8
@@ -17,10 +18,18 @@ void test_camara(cv::VideoCapture& cap){
 }
 
 int main() {
+    
     cv::VideoCapture cap(0);
     test_camara(cap);
  
-    FaceClassifier face_classifier = FaceClassifier();
+    FeatureExtractor* feature_extractor = new SimpleFeatureExtractor("dataset/fer2013");
+    EmotionClassifier* emotion_classifier = new MockClassifier();
+
+    FaceClassifier face_classifier = FaceClassifier(
+        feature_extractor,
+        emotion_classifier  
+    );
+
     cv::Mat frame; 
     cv::Mat gray;
     std::vector<cv::Rect> faces;

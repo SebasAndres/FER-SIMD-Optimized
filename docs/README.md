@@ -21,21 +21,16 @@ Como contexto, el trabajo en FER tiene 3 etapas principales:
 
 [3] **Clasificación de caras**: El approach inicial, y vi en los papers que es muy usado, va a ser con KNN. Sería computar la matriz de distancias entre vectores y hacer la inferencia de forma optimizada con SIMD.
 
-### Pipeline
-sdaeijfoaijdeoisjoifjsaoijdoiejsaoiefjsaoiejfoisajeoijsaeoi
-<img src='img/pipeline.png' width=400 height=200>
-
-#### Download dataset
-sdaeijfoaijdeoisjoifjsaoijdoiejsaoiefjsaoiejfoisajeoijsaeoi
-
-#### Initialize vectorizer
-sdaeijfoaijdeoisjoifjsaoijdoiejsaoiefjsaoiejfoisajeoijsaeoi
+## TODO:
+- Trabajar en que funcione `application.cpp` usando de forma modularizada a `FaceExtractor` y `FaceClassifier`. 
+--> Usar **KNN** y **PCA** en primer lugar.
+- Luego trabajar en `FaceExtractor::LBPExtractor`.
 
 #### Run application
 <img src='img/application_loop.png' width=200 height=300>
 
-
 ### Papers
-* [Haar Features - Viola & Jones Algorithm](https://www.merl.com/publications/docs/TR2004-043.pdf)
+* [Haar Features | Viola & Jones Algorithm](https://www.merl.com/publications/docs/TR2004-043.pdf)
 * [Facial expression recognition techniques](https://ietresearch.onlinelibrary.wiley.com/doi/epdf/10.1049/iet-ipr.2018.6647)
 * [LBP](https://link.springer.com/chapter/10.1007/978-3-540-24670-1_36)
+

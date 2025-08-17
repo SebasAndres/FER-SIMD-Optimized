@@ -10,8 +10,8 @@ test_camara_filter/*
 poetry.lock
 .python-version
 
-src/camara 
-src/initialize_vectorizer
+src/application
+src/extract_features
 
 *.dat
 *.csv
