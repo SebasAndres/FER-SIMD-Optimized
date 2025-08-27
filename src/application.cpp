@@ -18,20 +18,19 @@ void test_camara(cv::VideoCapture& cap){
 }
 
 int main() {
-    
-    cv::VideoCapture cap(0);
-    test_camara(cap);
- 
-    FeatureExtractor* feature_extractor = new SimpleFeatureExtractor("dataset/fer2013");
-    EmotionClassifier* emotion_classifier = new MockClassifier();
+     
+    FeatureExtractor* feature_extractor = new PCAFeatureExtractor("dataset/fer2013", 100);
+    EmotionClassifier* emotion_classifier = new KNNClassifier("data/projected_faces");
 
     FaceClassifier face_classifier = FaceClassifier(
         feature_extractor,
         emotion_classifier  
     );
 
+    cv::VideoCapture cap(0);
+    test_camara(cap);
+
     cv::Mat frame; 
-    cv::Mat gray;
     std::vector<cv::Rect> faces;
 
     while (true) {

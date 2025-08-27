@@ -20,4 +20,14 @@ public:
     std::string classify(const std::vector<float>& features) override;
 };
 
+
+class KNNClassifier : public EmotionClassifier {
+public:
+    KNNClassifier(const std::string& dataset_path);
+    std::string classify(const std::vector<float>& features) override;
+
+private:
+    std::vector<std::pair<std::string, std::vector<float>>> points;
+};
+
 #endif

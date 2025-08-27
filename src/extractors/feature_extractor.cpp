@@ -1,6 +1,12 @@
 #include "feature_extractor.h"
 
+FeatureExtractor::FeatureExtractor(std::string dataset_path) {
+    this->dataset_path = dataset_path;
+}
+
+FeatureExtractor::~FeatureExtractor() {
+
+}
+
 std::vector<float> FeatureExtractor::extractFeatures(const cv::Mat& image) {
-    // Método base, puede lanzar una excepción si se llama directamente
-    throw std::runtime_error("FeatureExtractor::extractFeatures debe ser implementado por una subclase.");
 }

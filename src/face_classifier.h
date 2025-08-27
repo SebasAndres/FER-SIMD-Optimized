@@ -10,13 +10,12 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/objdetect.hpp>
 
+#include "file_manager.h"
 #include "classifiers/classifier.h"
 #include "extractors/feature_extractor.h"
 #include "linalg.h"
 
 #define PROCESSED_IMG_SIZE 48
-
-namespace fs = std::filesystem;
 
 struct FaceNode {
     int type;
@@ -31,7 +30,10 @@ public:
     );
     ~FaceClassifier(); 
     
-    void detectFaces(const cv::Mat& gray_frame, std::vector<cv::Rect>& faces);
+    void detectFaces(
+        const cv::Mat& gray_frame, 
+        std::vector<cv::Rect>& faces
+    );
     std::string classifyFace(const cv::Mat& face_img);
     std::vector<float> vectorizeFace(const cv::Mat& face_img);    
     

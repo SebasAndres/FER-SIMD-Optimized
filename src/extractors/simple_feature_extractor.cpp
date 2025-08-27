@@ -20,7 +20,6 @@ std::vector<float> SimpleFeatureExtractor::extractFeatures(const cv::Mat& image)
     }
     gray.convertTo(gray, CV_8UC1); // Asegura el tipo correcto
 
-
     cv::Mat resized_face;
     cv::resize(
         gray, 

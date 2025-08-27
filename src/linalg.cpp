@@ -35,9 +35,6 @@ std::vector<float> projectInto1D(const cv::Mat& image) {
     std::vector<float> vector;
     vector.reserve(image.rows * image.cols);
 
-    // Asegúrate de que la imagen es de tipo uchar (CV_8UC1)
-    CV_Assert(image.type() == CV_8UC1);
-
     for (int i = 0; i < image.rows; ++i) {
         const uchar* rowPtr = image.ptr<uchar>(i); 
         for (int j = 0; j < image.cols; ++j) {
