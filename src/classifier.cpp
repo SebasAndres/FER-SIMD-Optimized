@@ -151,7 +151,7 @@ std::string FaceClassifier::runClassification(std::vector<float> face_vector) {
     // categories_mean_vector: map<label, mean_vector>
 
     for (const auto& [label, mean_vec] : this->categories_mean_vector) {
-        float dist = euclideanDistance(face_vector, mean_vec);
+        float dist = euclideanDistanceASM(face_vector.data(), mean_vec.data(), face_vector.size());
         knn_queue.push({-dist, label}); // use negative distance for min-heap
     }
 
