@@ -1,8 +1,0 @@
-README.md
-pyproject.toml
-src/download_dataset.py
-src/aoc_final.egg-info/PKG-INFO
-src/aoc_final.egg-info/SOURCES.txt
-src/aoc_final.egg-info/dependency_links.txt
-src/aoc_final.egg-info/requires.txt
-src/aoc_final.egg-info/top_level.txt

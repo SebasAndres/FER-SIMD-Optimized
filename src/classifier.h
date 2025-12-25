@@ -6,12 +6,14 @@
 #include <iostream>
 #include <vector>
 #include <queue>
+#include <map>
 #include <opencv2/opencv.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/objdetect.hpp>
 
 #include "linalg.h"
 
+#define NUM_CATEGORIES 7
 #define PROCESSED_IMG_SIZE 48
 
 namespace fs = std::filesystem;
@@ -32,9 +34,9 @@ public:
     
 private:
     cv::CascadeClassifier face_detector;  
-    std::vector<float> meanVector;
-    std::vector<std::vector<float>> pcaBasis;
-
+    std::vector<float> mean_vector;
+    std::vector<std::vector<float>> pca_basis;
+    std::map<std::string, std::vector<float>> categories_mean_vector; 
     
     std::string runClassification(std::vector<float> face_vector);    
     std::vector<std::vector<float>> loadVectorsFromCsv(const std::string& file_path);

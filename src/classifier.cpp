@@ -7,7 +7,7 @@ FaceClassifier::FaceClassifier() {
     }
 
     // load mean vector
-    std::ifstream mean_file("dataset/mean_vector.csv");
+    std::ifstream mean_file("data/mean_vector.csv");
     if (!mean_file.is_open()) {
         std::cout << "Could not load mean vector file\n";
     }
@@ -17,7 +17,7 @@ FaceClassifier::FaceClassifier() {
         std::stringstream ss(line);
         std::string value;
         while (std::getline(ss, value, ',')) {
-            meanVector.push_back(std::stof(value));
+            mean_vector.push_back(std::stof(value));
         }
         mean_file.close();
     }
@@ -36,17 +36,18 @@ FaceClassifier::FaceClassifier() {
             while (std::getline(ss, value, ',')) {
                 pca_vector.push_back(std::stof(value));
             }
-            pcaBasis.push_back(pca_vector);
+            pca_basis.push_back(pca_vector);
         }
 
         // calculate mean vectors (centroids) for each category
         std::string pca_faces_dir = "data/pca_faces";
         for (const auto& entry : fs::directory_iterator(pca_faces_dir)) {
-            if (entry.is_directory()) {
-                std::string name = entry.path().filename().string();
-                std::string file = pca_faces_dir + "/" + name + "_pca_faces.csv";           
+            if (entry.is_regular_file() && entry.path().extension() == ".csv") {
+                std::string filename = entry.path().filename().string();
+                // Extract category name from filename (e.g., "angry_faces.csv" -> "angry")
+                std::string name = filename.substr(0, filename.find("_faces.csv"));
 
-                std::vector<std::vector<float>> vectors = loadVectorsFromCsv(file);
+                std::vector<std::vector<float>> vectors = loadVectorsFromCsv(entry.path().string());
                 std::vector<float> category_mean_vector = calculateMeanVector(vectors);
                 categories_mean_vector[name] = category_mean_vector;
             }
@@ -106,10 +107,10 @@ std::vector<float> FaceClassifier::vectorizeFace(const cv::Mat& face_img) {
     std::vector<float> vector = projectInto1D(bn_face);
 
     // [4] Substract the means    
-    std::vector<float> vector_normalized = centerVector(vector, this->meanVector); 
+    std::vector<float> vector_normalized = centerVector(vector, this->mean_vector); 
 
     // [5] Project vector into PCA space
-    std::vector<float> result = projectIntoPCA(vector, this->pcaBasis);
+    std::vector<float> result = projectIntoPCA(vector, this->pca_basis);
 
     return result;
 }
@@ -140,7 +141,45 @@ std::string FaceClassifier::runClassification(std::vector<float> face_vector) {
     - The predicted face type as a string.
     */
 
-    return "happy";
+    // k value (small odd number, e.g. 3 or 5)
+    constexpr int k = 3;
+
+    // Prepare neighbors {distance, label}
+    std::priority_queue<std::pair<float, std::string>> knn_queue;
+
+    // Preload all mean vectors per category
+    // categories_mean_vector: map<label, mean_vector>
+
+    for (const auto& [label, mean_vec] : this->categories_mean_vector) {
+        float dist = euclideanDistance(face_vector, mean_vec);
+        knn_queue.push({-dist, label}); // use negative distance for min-heap
+    }
+
+    // Gather top-k nearest neighbors
+    std::vector<std::string> neighbors;
+    int n = std::min(k, (int)this->categories_mean_vector.size());
+    for (int i = 0; i < n && !knn_queue.empty(); ++i) {
+        neighbors.push_back(knn_queue.top().second);
+        knn_queue.pop();
+    }
+
+    // Majority vote
+    std::map<std::string, int> label_count;
+    for (const std::string& label : neighbors) {
+        label_count[label]++;
+    }
+
+    // Find most frequent label (may break ties arbitrarily)
+    std::string predicted = "";
+    int max_count = 0;
+    for (const auto& [label, count] : label_count) {
+        if (count > max_count) {
+            max_count = count;
+            predicted = label;
+        }
+    }
+
+    return predicted.empty() ? "unknown" : predicted;
 }
 
 

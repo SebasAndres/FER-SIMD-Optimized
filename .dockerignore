@@ -1,0 +1,30 @@
+# Git
+.git
+.gitignore
+
+# Python
+.venv
+__pycache__
+*.pyc
+.python-version
+
+# Build artifacts
+*.o
+*.gdb_history
+src/initialize_vectorizer
+src/application
+src/camara
+
+# IDE
+.vscode
+*.code-workspace
+
+# Data (will be downloaded or mounted)
+src/dataset
+src/data
+*.dat
+*.csv
+
+# Misc
+.env
+*.log

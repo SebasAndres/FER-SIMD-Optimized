@@ -1,5 +1,6 @@
 *.o
 *.gdb_history
+kaggle.json
 
 src/dataset/*
 src/data/*

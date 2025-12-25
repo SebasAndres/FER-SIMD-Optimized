@@ -5,7 +5,7 @@
 Este proyecto es un clasificador de caras construido en base a `OpenCV`, `HaarExtractionAlgorithm` y 
 `KNN`.
 
-<img src='img/flujo.png' width=500 height=500>
+<img src='docs/img/flujo.png' width=500 height=500>
 
 Mi idea es implementar un sistema de Face Emotion Recognition (FER) optimizado con SIMD que detecte en tiempo real caras y las clasifique según su estado de ánimo (feliz, triste, enojado, neutral, etcétera). El entregable sería un proyecto el cual vos al correrlo te prende la cámara de la computadora y ves cómo clasifica todas las caras que aparezcan.
 
@@ -22,18 +22,69 @@ Como contexto, el trabajo en FER tiene 3 etapas principales:
 [3] **Clasificación de caras**: El approach inicial, y vi en los papers que es muy usado, va a ser con KNN. Sería computar la matriz de distancias entre vectores y hacer la inferencia de forma optimizada con SIMD.
 
 ### Pipeline
-sdaeijfoaijdeoisjoifjsaoijdoiejsaoiefjsaoiejfoisajeoijsaeoi
-<img src='img/pipeline.png' width=400 height=200>
+<img src='docs/img/pipeline.png' width=400 height=200>
+<img src='docs/img/application_loop.png' width=200 height=300>
 
-#### Download dataset
-sdaeijfoaijdeoisjoifjsaoijdoiejsaoiefjsaoiejfoisajeoijsaeoi
+### Ejecucion
 
-#### Initialize vectorizer
-sdaeijfoaijdeoisjoifjsaoijdoiejsaoiefjsaoiejfoisajeoijsaeoi
+#### Opcion 1: Docker (recomendado)
 
-#### Run application
-<img src='img/application_loop.png' width=200 height=300>
+**Requisitos:**
+- Docker y Docker Compose
+- Credenciales de Kaggle (para descargar el dataset)
+- Webcam (para la aplicacion en tiempo real)
 
+**Paso 1: Configurar credenciales de Kaggle**
+
+1. Ir a https://www.kaggle.com/settings -> API -> "Create New Token"
+2. Crear archivo `kaggle.json` en la raiz del proyecto:
+```json
+{"username":"tu_usuario","key":"tu_api_key"}
+```
+
+**Paso 2: Construir la imagen**
+```bash
+docker compose build
+```
+
+**Paso 3: Ejecutar el pipeline**
+```bash
+# Habilitar acceso X11 (en el host)
+xhost +local:docker
+
+# Entrar al container
+docker compose run fer bash
+
+# Dentro del container, ejecutar el pipeline completo
+cd src && make pipeline
+```
+
+**Comandos individuales (dentro del container):**
+```bash
+make download_dataset      # Descargar dataset FER2013
+make initialize_vectorizer # Compilar y generar vectores PCA
+make application           # Compilar aplicacion
+make run_application       # Ejecutar con webcam
+```
+
+**Debugging con GDB:**
+```bash
+cd src
+make application
+gdb ./application
+```
+
+#### Opcion 2: Instalacion local
+
+```bash
+# Instalar dependencias
+sudo apt update && sudo apt install pkg-config libopencv-dev
+
+# Configurar Kaggle (~/.kaggle/kaggle.json)
+
+# Ejecutar pipeline
+cd src && make pipeline
+```
 
 ### Papers
 * [Haar Features - Viola & Jones Algorithm](https://www.merl.com/publications/docs/TR2004-043.pdf)

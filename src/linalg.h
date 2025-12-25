@@ -5,9 +5,14 @@
 #include <vector>
 #include <cmath>
 
+// Función implementada en assembly (linalg_asm.asm)
+extern "C" {
+    float euclideanDistanceASM(const float* vec1, const float* vec2, size_t length);
+}
+
 float euclideanDistance(
-    std::vector<float>& face_vector1, 
-    std::vector<float>& face_vector2,
+    const std::vector<float>& face_vector1,
+    const std::vector<float>& face_vector2,
     const size_t VECTOR_LENGTH = 3780
 ); 
 

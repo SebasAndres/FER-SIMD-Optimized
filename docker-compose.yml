@@ -1,0 +1,24 @@
+services:
+  fer:
+    build: .
+    image: fer-simd-optimized
+    container_name: fer-simd
+    volumes:
+      - .:/app
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ./kaggle.json:/root/.kaggle/kaggle.json:ro
+      - ${HOME}/.Xauthority:/root/.Xauthority:ro
+    working_dir: /app
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - XAUTHORITY=/root/.Xauthority
+    network_mode: host
+    devices:
+      - /dev/video0:/dev/video0
+    privileged: true
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_PTRACE
+    stdin_open: true
+    tty: true

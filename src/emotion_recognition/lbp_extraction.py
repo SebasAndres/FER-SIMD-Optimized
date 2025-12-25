@@ -10,10 +10,12 @@ def extract_lbp(image):
     return hist
 
 if __name__ == "__main__":
+    print("Extracting LBP features from FER2013 dataset")
     os.makedirs("data/lbp_faces", exist_ok=True)
     for _dir in os.listdir("dataset/fer2013"):
+        print(f"> Extracting {_dir}")
         dir_path = f"dataset/fer2013/{_dir}"
-        images = [img for img in os.listdir(dir_path) if img.endswith(".png")]
+        images = [img for img in os.listdir(dir_path) if img.endswith(".jpg")]
         rows = []
         for _img in images:
             img_path = os.path.join(dir_path, _img)
@@ -23,3 +25,4 @@ if __name__ == "__main__":
             rows.append(row)
         lbp_hist_df = pd.DataFrame(rows, columns=[*range(256), 'label'])
         lbp_hist_df.to_csv(f"data/lbp_faces/{_dir}_faces.csv", mode='a', header=False, index=False)
+    print("Finished.")

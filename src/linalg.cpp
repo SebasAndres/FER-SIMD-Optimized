@@ -1,8 +1,9 @@
 #include "linalg.h"
 
 float euclideanDistance(
-    std::vector<float>& face_vector1, 
-    std::vector<float>& face_vector2
+    const std::vector<float>& face_vector1,
+    const std::vector<float>& face_vector2,
+    const size_t VECTOR_LENGTH
 ){
     /*
     This function computes the Euclidean distance between two face vectors.

@@ -9,13 +9,16 @@ CAMARA_CXXFLAGS = `pkg-config --cflags opencv4` -std=c++17 $(CFLAGS)
 CAMARA_LDFLAGS = `pkg-config --libs opencv4`
 
 download_dataset: 
-	python download_dataset.py
+	uv run python download_dataset.py
 
-initialize_vectorizer: initialize_vectorizer.cpp classifier.cpp linalg.cpp
-	$(CXX) $(CAMARA_CXXFLAGS) initialize_vectorizer.cpp classifier.cpp linalg.cpp -o initialize_vectorizer $(CAMARA_LDFLAGS)
+linalg_asm.o: linalg_asm.asm
+	$(AS) $(ASFLAGS) linalg_asm.asm -o linalg_asm.o
 
-application: application.cpp classifier.cpp linalg.cpp
-	$(CXX) $(CAMARA_CXXFLAGS) application.cpp classifier.cpp linalg.cpp -o application $(CAMARA_LDFLAGS)
+initialize_vectorizer: initialize_vectorizer.cpp classifier.cpp linalg.cpp linalg_asm.o
+	$(CXX) $(CAMARA_CXXFLAGS) initialize_vectorizer.cpp classifier.cpp linalg.cpp linalg_asm.o -o initialize_vectorizer $(CAMARA_LDFLAGS)
+
+application: application.cpp classifier.cpp linalg.cpp linalg_asm.o
+	$(CXX) $(CAMARA_CXXFLAGS) application.cpp classifier.cpp linalg.cpp linalg_asm.o -o application $(CAMARA_LDFLAGS)
 
 run_application: application
 	./application
@@ -25,12 +28,11 @@ pipeline:
 	make clean
 	make download_dataset
 	make initialize_vectorizer
-	make application
-	make run
+	make run_application
 	@echo "Pipeline completado."
 
 clean:
-	rm -f camara generate
+	rm -f camara generate application initialize_vectorizer *.o
 	@echo "Clean completado."
 
 .PHONY: test
