@@ -2,8 +2,7 @@
 *.gdb_history
 kaggle.json
 
-src/dataset/*
-src/data/*
+data/*
 src/.vscode/*
 test_camara_filter/*
 .vscode/
@@ -13,6 +12,7 @@ poetry.lock
 
 src/camara 
 src/initialize_vectorizer
+src/app
 
 *.dat
 *.csv

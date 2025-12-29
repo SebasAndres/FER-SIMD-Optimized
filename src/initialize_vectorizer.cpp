@@ -1,42 +1,61 @@
-/*
-This script processes the dataset to compute the media face vector and
-PCA basis in order to vectorize any new face
+/* Este script procesa el dataset para generar:
+ * 1. Vector medio (mean_vector.csv)
+ * 2. Base PCA (pca_basis.csv)
+ * 3. Vectores PCA por categoría (pca_faces/*.csv)
+ * 4. Un índice IVF para búsqueda eficiente 
 */
-
 
 #include "classifier.h"
 #include "linalg.h"
+#include "csv_utils.h"
+#include "types.h"
+#include "constants.h"
 
-#define PROCESSED_IMG_SIZE 48
+#include <random>
+#include <numeric>
+#include <algorithm>
 
-void extractFacesFromImagesInFolder(
-    FaceClassifier& classifier,
-    std::string dir_path,
-    std::function<std::vector<float>(cv::Mat)> vectorizer_function,
-    std::vector<std::vector<float>>& faces_matrix
-){
-    /*
-    This function processes a folder containing images of faces, detects faces in each image,
-    vectorizes the detected faces.
+std::vector<float> getFaceHOGVector(cv::Mat face_img) {
+    // Extrae las HOG features dado un frame de un rostro
+    cv::Mat resized_face;
+    cv::resize(
+        face_img,
+        resized_face,
+        cv::Size(IMG_SIZE, IMG_SIZE)
+    );
+    cv::Mat equalized;
+    cv::equalizeHist(resized_face, equalized);
 
-    Parameters:
-    - dir_path: The path to the directory containing the images.
-    - analysis_file: An output file stream to write the vectorized face data.
+    size_t hog_size;
+    float* hog_ptr = extractHOG(equalized, &hog_size);
+    std::vector<float> result(hog_ptr, hog_ptr + hog_size);
+    free(hog_ptr);
+    return result;
+}
+
+
+void extractFacesFromDirectory(
+    const std::string& dir_path,
+    std::function<std::vector<float>(cv::Mat)> vectorizer,
+    std::vector<std::vector<float>>& output_vectors
+) {
+    /* Dado un directorio con imagenes, las recorre y detecta caras.
+    Por cada cara detectada aplica la vectorización y la acumula en 
+    output_vectors.
     */
 
-    std::cout << "*Processing directory: " << dir_path << "\n";
+    cv::CascadeClassifier face_detector;
+    if (!face_detector.load("face_detection/haarcascade_frontalface_default.xml")) {
+        std::cerr << "Error loading Haar\n";
+        exit(1);
+    }
 
+    std::cout << "  Procesando: " << dir_path << "\n";
     for (const auto& entry : fs::directory_iterator(dir_path)) {
-
-        // Load image 
         std::string file_path = entry.path().string();
         cv::Mat img = cv::imread(file_path);
-        if (img.empty()) {
-            std::cerr << "Error loading image: " << file_path << "\n";
-            continue;
-        }
-        
-        // Convert image to grayscale if it has 3 channels (BGR)
+        if (img.empty()) continue;
+
         cv::Mat gray_img;
         if (img.channels() == 3) {
             cv::cvtColor(img, gray_img, cv::COLOR_BGR2GRAY);
@@ -44,196 +63,382 @@ void extractFacesFromImagesInFolder(
             gray_img = img.clone();
         }
 
-        // Detect faces
         std::vector<cv::Rect> faces;
-        classifier.detectFaces(gray_img, faces);
- 
-        // Vectorize each detected face and write to the CSV file
+        face_detector.detectMultiScale(gray_img, faces);
+
         for (const auto& face : faces) {
             cv::Rect safe_face = face & cv::Rect(0, 0, gray_img.cols, gray_img.rows);
             if (safe_face.area() == 0) continue;
+
             cv::Mat face_img = gray_img(safe_face).clone();
-            std::vector<float> face_vector = vectorizer_function(face_img);
-            if (face_vector.empty()) continue;
-            faces_matrix.push_back(face_vector);
-        }
-    }
-}
+            std::vector<float> vec = vectorizer(face_img);
 
-
-std::vector<float> simpleProjectionVectorizer(cv::Mat face_img){
-    cv::Mat resized_face;
-    cv::resize(
-        face_img, 
-        resized_face, 
-        cv::Size(PROCESSED_IMG_SIZE, PROCESSED_IMG_SIZE)
-    );
-    std::vector<float> face_vector = projectInto1D(resized_face);
-    return face_vector;
-}
-
-
-void saveVectorsToCSV(
-    const std::vector<std::vector<float>>& vectors, 
-    const std::string& file_path
-) {
-    /*
-    This function saves a set of vectors to a CSV file.
-    Parameters:
-    - vectors: A vector of vectors to be saved.
-    - file_path: The path to the output CSV file.
-    */
-    
-    std::ofstream file(file_path);
-    if (!file.is_open()) {
-        std::cerr << "Error opening file for writing: " << file_path << "\n";
-        return;
-    }
-
-    for (const auto& vec : vectors) {
-        for (size_t i = 0; i < vec.size(); ++i) {
-            file << vec[i];
-            if (i < vec.size() - 1) {
-                file << ",";
+            if (!vec.empty()) {
+                output_vectors.push_back(vec);
             }
         }
-        file << "\n";
-    }
-    file.close();
-}
- 
-
-void collectFaces1D(
-    std::string original_dataset_path, 
-    std::vector<std::vector<float>>& faces_matrix
-) {   
-    /*
-    This function generates a dataset of vectorized face images from the specified directories.
-    It processes images from every subdirectory, which represents a face type.
-    */
-
-    std::string faces_dir = "data/faces";
-
-    // Ensure the directory exists before writing files
-    if (!fs::exists(faces_dir)) {
-        fs::create_directories(faces_dir);
-    }
-
-    // Insert datasets for each face type
-    FaceClassifier classifier;
-    for (const auto& entry : fs::directory_iterator(original_dataset_path)) {
-        if (entry.is_directory()) {
-            extractFacesFromImagesInFolder(
-                classifier, 
-                entry.path().string(), 
-                simpleProjectionVectorizer,
-                faces_matrix
-            );
-            std::string name = entry.path().filename().string();
-            std::string output_csv = faces_dir + "/" + name + "_faces.csv";           
-            saveVectorsToCSV(faces_matrix, output_csv);        
-        }
     }
 }
 
-
-void saveMeanVector(
-    const std::vector<float>& mean_vector, 
-    const std::string& file_path
+void collectAllFaces1D(
+    const std::string& dataset_path,
+    std::vector<std::vector<float>>& all_faces
 ) {
-    /*
-    This function saves the mean vector to a CSV file.
-    Parameters:
-    - mean_vector: The mean vector to be saved.
-    - file_path: The path to the output CSV file.
+    /* Por cada tipo de cara en el dataset, obtener rostros y 
+    vectorizarlos con HOG, devolviendolos de forma unificada en
+    el parámetro inout all_faces y guardardolos en una carpeta por
+    categoría.
     */
-    
-    std::ofstream file(file_path);
-    if (!file.is_open()) {
-        std::cerr << "Error opening file for writing: " << file_path << "\n";
-        return;
+    std::cout << "\n[Paso 1] Recolectando caras del dataset...\n";
+
+    csv::ensureDirectoryExists("../data/processed/faces");
+
+    for (const auto& category : EMOTION_CATEGORIES) {
+        std::string category_path = dataset_path + "/" + category;
+        std::vector<std::vector<float>> category_faces;
+        extractFacesFromDirectory(
+            category_path, 
+            getFaceHOGVector, 
+            category_faces
+        );
+        std::string output_path = "../data/processed/faces/" + category + "_faces.csv";
+        csv::writeMatrix(category_faces, output_path);
+
+        // Agrego al conjunto total
+        for (const auto& face : category_faces) {
+            all_faces.push_back(face);
+        }
+        std::cout << "    " << category << ": " << category_faces.size() << " caras\n";
     }
 
-    for (size_t i = 0; i < mean_vector.size(); ++i) {
-        file << mean_vector[i];
-        if (i < mean_vector.size() - 1) {
-            file << ",";
-        }
-    }
-    file.close();
+    std::cout << "  Total: " << all_faces.size() << " caras\n";
 }
 
-
-void rescanFacesWithPCA(
-    const std::string& original_dataset_path, 
-    const std::vector<std::vector<float>>& pca_basis
+PCAResult computeAndSavePCA(
+    std::vector<std::vector<float>>& faces,
+    int num_components
 ) {
-    /*
-    This function rescans the faces in the original dataset and projects them into PCA space.
-    It saves the projected faces in a new directory named "pca_faces".
-    
-    Parameters:
-    - original_dataset_path: The path to the original dataset containing face images.
-    - pca_basis: The PCA basis vectors used for projection.
-    */
-    
-    std::string pca_faces_dir = "data/pca_faces";
-    fs::create_directory(pca_faces_dir);
+    std::cout << "\n[Paso 2] Calculando PCA...\n";
 
-    FaceClassifier classifier;     
-    for (const auto& entry : fs::directory_iterator(original_dataset_path)) {
-        if (entry.is_directory()) {
-            std::string name = entry.path().filename().string();
-            std::string output_csv = pca_faces_dir + "/" + name + "_faces.csv";           
-            std::vector<std::vector<float>> projected_faces;
-            extractFacesFromImagesInFolder(
-                classifier,
-                entry.path().string(), 
-                [&](cv::Mat face) {
-                    std::vector<float> face_vector = projectInto1D(face);
-                    if (face_vector.empty()) return std::vector<float>();
-                    return projectIntoPCA(face_vector, pca_basis);
-                },
-                projected_faces
-            );
-            saveVectorsToCSV(projected_faces, output_csv);        
-        }
+    size_t num_vectors = faces.size();
+    size_t vector_dim = faces[0].size();
+
+    // Convertir a float**
+    float** faces_ptr = (float**)malloc(num_vectors * sizeof(float*));
+    for (size_t i = 0; i < num_vectors; ++i) {
+        faces_ptr[i] = faces[i].data();
     }
+
+    // [1] Vector medio
+    std::cout << "  Calculando vector medio...\n";
+    float* mean_vec = calculateMeanVector(faces_ptr, num_vectors, vector_dim);
+    csv::writeVectorRaw(mean_vec, vector_dim, "../data/processed/mean_vector.csv");
+
+    // [2] Centrar vectores
+    std::cout << "  Centrando vectores...\n";
+    float** centered = centerVectors(faces_ptr, mean_vec, num_vectors, vector_dim);
+
+    // [3] Matriz de covarianza
+    std::cout << "  Calculando matriz de covarianza...\n";
+    cv::Mat cov_matrix = calculateCovarianceMatrix(centered, num_vectors, vector_dim);
+
+    // [4] Base PCA
+    std::cout << "  Calculando " << num_components << " componentes PCA...\n";
+    size_t pca_vector_dim;
+    float** pca_basis = calculatePCABasis(cov_matrix, num_components, &pca_vector_dim);
+    csv::writeMatrixRaw2D(pca_basis, num_components, pca_vector_dim, "../data/processed/pca_basis.csv");
+
+    // Convertir resultados a std::vector para PCAResult
+    std::vector<float> mean_vec_result(mean_vec, mean_vec + vector_dim);
+    std::vector<std::vector<float>> pca_basis_result(num_components);
+    for (int i = 0; i < num_components; ++i) {
+        pca_basis_result[i] = std::vector<float>(pca_basis[i], pca_basis[i] + pca_vector_dim);
+    }
+
+    free(faces_ptr);
+    free(mean_vec);
+    freeMatrix(centered, num_vectors);
+    freeMatrix(pca_basis, num_components);
+
+    std::cout << "  PCA guardado en data/processed/pca_basis.csv\n";
+    return {pca_basis_result, mean_vec_result};
 }
 
 
-int main(){
-   
-    std::cout << "> Generating dataset...\n";
-    std::vector<std::vector<float>> faces_matrix;
-    collectFaces1D("dataset/fer2013", faces_matrix);    
+void projectFacesToPCA(
+    const std::string& dataset_path,
+    const std::vector<std::vector<float>>& pca_basis,
+    const std::vector<float>& mean_vector
+) {
+    std::cout << "\n[Paso 3] Proyectando caras a espacio PCA...\n";
+    csv::ensureDirectoryExists("../data/processed/pca_faces");
+
+    size_t num_components = pca_basis.size();
+    size_t pca_vector_dim = pca_basis[0].size();
+
+    // Convertir pca_basis a float**
+    float** pca_basis_ptr = (float**)malloc(num_components * sizeof(float*));
+    for (size_t i = 0; i < num_components; ++i) {
+        pca_basis_ptr[i] = (float*)pca_basis[i].data();
+    }
+
+    auto pca_vectorizer = [&](cv::Mat face) -> std::vector<float> {
+        cv::Mat equalized;
+        cv::equalizeHist(face, equalized);
+
+        size_t hog_size;
+        float* hog_ptr = extractHOG(equalized, &hog_size);
+
+        float* centered = centerVector(hog_ptr, mean_vector.data(), hog_size);
+        free(hog_ptr);
+
+        float* projected = projectIntoPCA(centered, pca_basis_ptr, num_components, pca_vector_dim);
+        free(centered);
+
+        std::vector<float> result(projected, projected + num_components);
+        free(projected);
+        return result;
+    };
+
+    for (const auto& category : EMOTION_CATEGORIES) {
+        std::string category_path = dataset_path + "/" + category;
+        if (!fs::exists(category_path)) continue;
+
+        std::vector<std::vector<float>> pca_faces;
+        extractFacesFromDirectory(category_path, pca_vectorizer, pca_faces);
+
+        std::string output_path = "../data/processed/pca_faces/" + category + "_faces.csv";
+        csv::writeMatrix(pca_faces, output_path);
+        std::cout << "    " << category << ": " << pca_faces.size() << " vectores PCA\n";
+    }
+
+    free(pca_basis_ptr);
+}
+
+void trainKMeans(
+    float* vectors,         // Todos los vectores N disponibles. 
+    int num_vectors,        // N: número de vectores.
+    float* centroids,       // [C x D] output: centroides.
+    int* assignments,       // [N] output: cluster de cada vector.
+    const IVFConfig& config
+) {
+    /* Calculo los `config.num_clusterss` centroides a partir de todos
+    los vectores, aplicando iteraciones de KMeans. */
+
+    int D = config.dim;
+    int C = config.num_clusters;
+
+    // [1] Centroides random (random sampling)
+    std::vector<int> indices(num_vectors);
+    std::iota(indices.begin(), indices.end(), 0);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::shuffle(indices.begin(), indices.end(), gen);
+    for (int c = 0; c < C; c++) {
+        int idx = indices[c];
+        std::memcpy(centroids + c * D, vectors + idx * D, D * sizeof(float));
+    }
+
+    // [2] Iteraciones Kmeans
+    int* num_vectors_per_centroid = (int*)std::malloc(C * sizeof(int));
+    for (int epoch = 0; epoch < config.kmeans_iters; epoch++) {
+
+        // Reseteo centroides y contadores
+        std::memset(centroids, 0, C * D * sizeof(float));
+        std::memset(num_vectors_per_centroid, 0, C * sizeof(int));
+
+        // Asigno cada vector al centroide mas cercano
+        for (int i = 0; i < num_vectors; i++) {
+            float* vector = vectors + i * D;
+            float min_distance = euclideanDistance(vector, centroids, D);
+            int closest_centroid_index = 0;
+            for (int c = 1; c < C; c++) {
+                float* centroid = centroids + c * D;
+                float distance = euclideanDistance(vector, centroid, D);
+                if (distance < min_distance) {
+                    min_distance = distance;
+                    closest_centroid_index = c;
+                }
+            }
+            assignments[i] = closest_centroid_index;
+        }
+
+        // Acumulo vectores en sus centroides
+        for (int i = 0; i < num_vectors; i++) {
+            int c = assignments[i];
+            float* vector = vectors + i * D;
+            float* centroid = centroids + c * D;
+
+            for (int d = 0; d < D; d++) {
+                centroid[d] += vector[d];
+            }
+            num_vectors_per_centroid[c]++;
+        }
+
+        // Divido por cantidad en cada centroide para obtener nuevos
+        // centroides
+        for (int c = 0; c < C; c++) {
+            if (num_vectors_per_centroid[c] > 0) {
+                float* centroid = centroids + c * D;
+                for (int d = 0; d < D; d++) {
+                    centroid[d] /= num_vectors_per_centroid[c];
+                }
+            }
+        }
+    }
+
+    std::free(num_vectors_per_centroid);
+}
+
+LabeledVectors subsampleHappy(const LabeledVectors& data, float ratio) {
+    // Submuestreo de la clase mayoritaria (happy) para balancear el dataset
+    std::cout << "  Aplicando submuestreo de happy (ratio " << ratio << ":1)...\n";
+    std::vector<int> class_counts(NUM_EMOTIONS, 0);
+    for (int label : data.labels) {
+        class_counts[label]++;
+    }
+    std::cout << "    Distribución original:\n";
+    for (int i = 0; i < NUM_EMOTIONS; i++) {
+        std::cout << "      " << EMOTION_CATEGORIES[i] << ": " << class_counts[i] << "\n";
+    }
+    int n_sad = class_counts[2];
+    int n_happy_target = static_cast<int>(n_sad * ratio);
+    n_happy_target = std::min(n_happy_target, class_counts[0]);  // no más que el original
+    std::vector<std::vector<int>> indices_by_class(NUM_EMOTIONS);
+    for (size_t i = 0; i < data.labels.size(); i++) {
+        indices_by_class[data.labels[i]].push_back(i);
+    }
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::shuffle(indices_by_class[0].begin(), indices_by_class[0].end(), gen);
+    indices_by_class[0].resize(n_happy_target);
+    std::vector<int> selected_indices;
+    for (int c = 0; c < NUM_EMOTIONS; c++) {
+        for (int idx : indices_by_class[c]) {
+            selected_indices.push_back(idx);
+        }
+    }
+    std::shuffle(selected_indices.begin(), selected_indices.end(), gen);
+    LabeledVectors result;
+    result.vectors.reserve(selected_indices.size());
+    result.labels.reserve(selected_indices.size());
+    for (int idx : selected_indices) {
+        result.vectors.push_back(data.vectors[idx]);
+        result.labels.push_back(data.labels[idx]);
+    }
+    std::vector<int> new_counts(NUM_EMOTIONS, 0);
+    for (int label : result.labels) {
+        new_counts[label]++;
+    }
+    std::cout << "    Distribución balanceada:\n";
+    for (int i = 0; i < NUM_EMOTIONS; i++) {
+        std::cout << "      " << EMOTION_CATEGORIES[i] << ": " << new_counts[i] << "\n";
+    }
+    std::cout << "    Total: " << result.vectors.size() << " vectores\n";
+    return result;
+}
+
+void buildIVFIndex(const IVFConfig& config) {
+    std::cout << "\n[Paso 4] Construyendo índice IVF...\n";
+
+    // Cargo vectores PCA con labels
+    std::cout << "  Cargando vectores PCA...\n";
+    LabeledVectors raw_data = csv::readLabeledVectors("../data/processed/pca_faces", EMOTION_CATEGORIES);
+
+    // Submuestreao de happy para balancear clases
+    LabeledVectors balanced_data = subsampleHappy(raw_data, SUBSAMPLE_RATIO);
     
-    std::cout << "> Calculating mean vector...\n";
-    std::vector<float> mean_vector = calculateMeanVector(faces_matrix);
+    // Convierto los vectores a memoria contigua
+    std::cout << "  Convirtiendo a memoria contigua...\n";
+    int N = balanced_data.vectors.size();
+    int D = config.dim;
+    int C = config.num_clusters;
+    float* vectors = (float*) malloc(sizeof(float) * N * D);
+    int* labels = new int[N];
+    for (int i = 0; i < N; ++i) {
+        std::memcpy(vectors + i * D, balanced_data.vectors[i].data(), D * sizeof(float));
+        labels[i] = balanced_data.labels[i];
+    }
+    std::cout << "    Total vectores: " << N << "\n";
+    std::cout << "    Dimensiones: " << D << "\n";
 
-    std::cout << "> Saving mean vector to 'data/mean_vector.csv'...\n";
-    saveMeanVector(mean_vector, "data/mean_vector.csv"); 
+    // Calculo los centroides
+    std::cout << "  Ejecutando K-means...\n";
+    float* centroids = (float*) malloc(sizeof(float) * C * D);
+    int* assignments = new int[N]();
+    trainKMeans(vectors, N, centroids, assignments, config);
 
-    std::cout << "> Centering vectors..\n";
-    centerVectors(faces_matrix, mean_vector);
+    // Reordeno vectores por cluster (listas invertidas)
+    std::cout << "  Construyendo listas invertidas...\n";
+    int* cluster_sizes = new int[C]();
+    for (int i = 0; i < N; i++) {
+        cluster_sizes[assignments[i]]++;
+    }
+    // cluster_offset[c] = "índice en vectors del primer elemento del cluster c"
+    int* cluster_offsets = new int[C + 1];
+    cluster_offsets[0] = 0;
+    for (int c = 0; c < C; c++) {
+        cluster_offsets[c + 1] = cluster_offsets[c] + cluster_sizes[c];
+    }
+    // reordeno arrays
+    float* vectors_sorted = (float*) malloc(sizeof(float) * N * D);
+    int* labels_sorted = new int[N];
+    int* write_pos = new int[C]; // dónde escribir el siguiente elemento de cluster c
+    std::memcpy(write_pos, cluster_offsets, C * sizeof(int));
+    for (int i = 0; i < N; i++) {
+        int c = assignments[i];
+        int dest = write_pos[c];
+        std::memcpy(vectors_sorted + dest * D, vectors + i * D, D * sizeof(float));
+        labels_sorted[dest] = labels[i];
+        write_pos[c]++;
+    }
+    std::cout << "    Listas invertidas construidas.\n";
 
-    // Calculate Covariance matrix
-    std::cout << "> Calculating covariance matrix...\n";
-    cv::Mat cov_matrix = calculateCovarianceMatrix(faces_matrix);
+    // Guardo índice IVF
+    std::cout << "  Guardando índice IVF...\n";
+    csv::ensureDirectoryExists("../data/processed/ivf");
+    csv::writeMatrixRaw(centroids, C, D, "../data/processed/ivf/centroids.csv");
+    std::cout << "    - data/processed/ivf/centroids.csv (" << C << " x " << D << ")\n";
+    csv::writeMatrixRaw(vectors_sorted, N, D, "../data/processed/ivf/vectors.csv");
+    std::cout << "    - data/processed/ivf/vectors.csv (" << N << " x " << D << ")\n";
+    csv::writeIntArray(cluster_offsets, C + 1, "../data/processed/ivf/cluster_offsets.csv");
+    std::cout << "    - data/processed/ivf/cluster_offsets.csv (" << C + 1 << " elementos)\n";
+    csv::writeIntArray(labels_sorted, N, "../data/processed/ivf/labels.csv");
+    std::cout << "    - data/processed/ivf/labels.csv (" << N << " elementos)\n";
 
-    // Calculate PCA basis
-    std::cout << "> Calculating PCA basis...\n";
-    std::vector<std::vector<float>> pca_basis = calculatePCABasis(
-        cov_matrix,
-        1000
-    );
+    std::free(vectors);
+    std::free(vectors_sorted);
+    std::free(centroids);
+    delete[] labels;
+    delete[] labels_sorted;
+    delete[] assignments;
+    delete[] cluster_sizes;
+    delete[] cluster_offsets;
+    delete[] write_pos;
 
-    // Save PCA basis to file
-    std::cout << "> Saving pca matrix to 'data/pca_basis.csv'...\n";
-    saveVectorsToCSV(pca_basis, "data/pca_basis.csv");
+    std::cout << "  Índice IVF guardado correctamente.\n";
+}
 
-    // Project the one-dimensional faces into PCA space
-    rescanFacesWithPCA("dataset/fer2013", pca_basis);
-    
+int main() {
+    std::string dataset_path = "../data/dataset/fer2013";
+
+    // [1] Obtengo todas las caras del dataset
+    std::vector<std::vector<float>> all_faces;
+    collectAllFaces1D(dataset_path, all_faces);
+
+    // [2] Calculo PCA sobre todos los vectores
+    int num_pca_components = PCA_DIM;
+    PCAResult pca_result = computeAndSavePCA(all_faces, num_pca_components);
+
+    // [3] Proyecto todos los vectores sobre la base PCA calculada
+    projectFacesToPCA(dataset_path, pca_result.basis, pca_result.mean_vector);
+
+    // [4] Armo y guardo datos para el IVFClassifier
+    IVFConfig ivf_config;
+    ivf_config.num_clusters = NUM_IVF_CLUSTERS;
+    ivf_config.dim = PCA_DIM;
+    buildIVFIndex(ivf_config);
+
+    std::cout << "Archivos generados\n";
     return 0;
 }

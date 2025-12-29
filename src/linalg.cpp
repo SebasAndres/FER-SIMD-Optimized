@@ -1,223 +1,271 @@
 #include "linalg.h"
+#include <cstdlib>
 
-float euclideanDistance(
-    const std::vector<float>& face_vector1,
-    const std::vector<float>& face_vector2,
-    const size_t VECTOR_LENGTH
+// Distancia euclideana --------------------------
+float euclideanDistanceC(
+    const float* vec1,
+    const float* vec2,
+    size_t length
 ){
-    /*
-    This function computes the Euclidean distance between two face vectors.
-    Parameters:
-    - face_vector1: The first face vector.
-    - face_vector2: The second face vector.
-    Returns:
-    - The Euclidean distance between the two vectors.
-    */
-    
     float distance = 0.0f;
-    size_t n = face_vector1.size();
-    for (size_t i = 0; i < n; ++i) {
-        float diff = face_vector1[i] - face_vector2[i];
+    for (size_t i = 0; i < length; ++i) {
+        float diff = vec1[i] - vec2[i];
         distance += diff * diff;
     }
     return std::sqrt(distance);
 }
 
-
-std::vector<float> projectInto1D(const cv::Mat& image) {
-    /*
-    This function projects a 2D image into a 1D vector.
-    Parameters:
-    - image: The input image in grayscale format.
-    Returns:
-    - A 1D vector representation of the image.
-    */
-    
-    std::vector<float> vector;
-    vector.reserve(image.rows * image.cols);
-
-    // Asegúrate de que la imagen es de tipo uchar (CV_8UC1)
-    CV_Assert(image.type() == CV_8UC1);
-
-    for (int i = 0; i < image.rows; ++i) {
-        const uchar* rowPtr = image.ptr<uchar>(i); 
-        for (int j = 0; j < image.cols; ++j) {
-            float cell = static_cast<float>(rowPtr[j]); 
-            vector.push_back(cell);
-        }
-    }
-
-    return vector;
-}
-
-std::vector<float> projectIntoPCA(
-    const std::vector<float>& vector, 
-    const std::vector<std::vector<float>>& pca_basis
-) {
-    /*
-    This function projects a vector into PCA space.
-    Parameters:
-    - vector: The input vector to be projected.
-    - pca_basis: The PCA basis vectors.
-    Returns:
-    - A vector projected into PCA space.
-    */
-   
-   // projected_vector := pcaBasis @ x_norm
-   // where pcaBasis is the PCA basis matrix and x_norm is the normalized input vector
- 
-    std::vector<float> projected_vector;
-    size_t k = pca_basis.size();
-    
-    for (size_t i = 0; i < k; ++i) {
-        float projection = 0.0f;
-        for (size_t j = 0; j < vector.size(); ++j) {
-            projection += pca_basis[i][j] * vector[j];
-        }
-        projected_vector.push_back(projection);
-    }
-
-    return projected_vector;
-}
-
-
-std::vector<float> centerVector(
-    const std::vector<float>& vector, 
-    const std::vector<float>& mean_vector
+float euclideanDistance(
+    const float* vec1,
+    const float* vec2,
+    size_t length
 ){
-    /*
-    This function subtracts the calculated mean vector from the input vector.
-    Parameters:
-    - vector: The input vector from which the mean will be subtracted.
-    - mean_vector: The mean vector to be subtracted.
-    Returns:
-    - A new vector with the mean subtracted.
-    */
+    #if USE_ASM_IMP
+        return euclideanDistanceASM(vec1, vec2, length);
+    #else
+        return euclideanDistanceC(vec1, vec2, length);
+    #endif
+}
 
-    std::vector<float> result(vector.size());    
-    for (size_t i = 0; i < vector.size(); ++i) {
+// Centrado de vectores -------------------------------
+float* centerVectorC(
+    const float* vector,
+    const float* mean_vector,
+    size_t dim
+){
+    float* result = (float*)malloc(dim * sizeof(float));
+    for (size_t i = 0; i < dim; ++i)
         result[i] = vector[i] - mean_vector[i];
-    }
-
     return result;
 }
 
-std::vector<std::vector<float>> centerVectors(
-    const std::vector<std::vector<float>>& vectors, 
-    const std::vector<float>& mean_vector
+float* centerVector(
+    const float* vector,
+    const float* mean_vector,
+    size_t dim
 ){
-    /*
-    This function centers a set of vectors by subtracting the mean vector from each vector.
-    Parameters:
-    - vectors: A vector of vectors to be centered.
-    - mean_vector: The mean vector to be subtracted from each vector.
-    Returns:
-    - A new vector of centered vectors.
-    */
-
-    std::vector<std::vector<float>> centered_vectors;
-    centered_vectors.reserve(vectors.size());
-
-    for (const auto& vec : vectors) {
-        centered_vectors.push_back(centerVector(vec, mean_vector));
-    }
-
-    return centered_vectors;
+    #if USE_ASM_IMP
+        return centerVectorASM(vector, mean_vector, dim);
+    #else
+        return centerVectorC(vector, mean_vector, dim);
+    #endif
 }
 
+float** centerVectors(
+    float** vectors,
+    const float* mean_vector,
+    size_t num_vectors,
+    size_t vector_dim
+){
+    float** result = (float**)malloc(num_vectors * sizeof(float*));
+    for (size_t i = 0; i < num_vectors; ++i)
+        result[i] = centerVector(vectors[i], mean_vector, vector_dim);
+    return result;
+}
 
-std::vector<float> calculateMeanVector(
-    const std::vector<std::vector<float>>& vectors
-) {
-    /*
-    This function calculates the mean vector from a set of vectors.
+// Calcular vector medio ----------------------------
+float* calculateMeanVectorC(
+    float** vectors,
+    size_t num_vectors,
+    size_t vector_dim
+){
+    float* mean_vector = (float*)malloc(vector_dim * sizeof(float));
+    for (size_t j = 0; j < vector_dim; j++) {
+        mean_vector[j] = 0.0f;
+    }
 
-    Parameters:
-    - vectors: A vector of vectors from which the mean will be calculated.
-    Returns:
-    - The mean vector.
-    */
-
-    std::vector<float> mean_vector(vectors[0].size(), 0.0f);
-    
-    for (const auto& vec : vectors) {
-        for (size_t i = 0; i < vec.size(); ++i) {
-            mean_vector[i] += vec[i];
+    for (size_t i = 0; i < num_vectors; i++) {
+        for (size_t j = 0; j < vector_dim; j++) {
+            mean_vector[j] += vectors[i][j];
         }
     }
-    
-    for (auto& value : mean_vector) {
-        value /= vectors.size();
+
+    float inv_n = 1.0f / (float)num_vectors;
+    for (size_t j = 0; j < vector_dim; j++) {
+        mean_vector[j] *= inv_n;
     }
-    
+
     return mean_vector;
 }
 
-cv::Mat calculateCovarianceMatrix(
-    const std::vector<std::vector<float>>& vectors
+float* calculateMeanVector(
+    float** vectors,
+    size_t num_vectors,
+    size_t vector_dim
 ){
-    /*
-    This function calculates the covariance matrix from a set of vectors.
+    #if USE_ASM_IMP
+        return calculateMeanVectorASM(vectors, num_vectors, vector_dim);
+    #else
+        return calculateMeanVectorC(vectors, num_vectors, vector_dim);
+    #endif
+}
 
-                             C = (1/n) * (X^T * X)
+// PCA ---------------------------------------
 
-    where C is the covariance matrix, n is the number of vectors, and X is the matrix 
-    formed by stacking the vectors.
+float dotProductC(
+    const float* vec1,
+    const float* vec2,
+    size_t length
+){
+    float result = 0.0f;
+    for (size_t i = 0; i < length; ++i) {
+        result += vec1[i] * vec2[i];
+    }
+    return result;
+}
 
-    Parameters:
-    - vectors: A vector of vectors from which the covariance matrix will be calculated.
-    
-    Returns:
-    - The covariance matrix as a cv::Mat object.
-    */
+float dotProduct(
+    const float* vec1,
+    const float* vec2,
+    size_t length
+){
+    #if USE_ASM_IMP
+        return dotProductASM(vec1, vec2, length);
+    #else
+        return dotProductC(vec1, vec2, length);
+    #endif
+}
 
-    size_t n = vectors.size();
-    size_t m = vectors[0].size();
-    
-    cv::Mat covariance_matrix = cv::Mat::zeros(m, m, CV_32F);
-    
-    for (const auto& vec : vectors) {
-        for (size_t i = 0; i < m; ++i) {
-            for (size_t j = 0; j < m; ++j) {
-                covariance_matrix.at<float>(i, j) += vec[i] * vec[j];
+// Proyección PCA: result = pca_basis @ vector
+float* projectIntoPCAC(
+    const float* vector,
+    float** pca_basis,
+    size_t num_components,
+    size_t vector_dim
+){
+    float* result = (float*)malloc(num_components * sizeof(float));
+    for (size_t i = 0; i < num_components; ++i) {
+        result[i] = dotProductC(pca_basis[i], vector, vector_dim);
+    }
+    return result;
+}
+
+float* projectIntoPCA(
+    const float* vector,
+    float** pca_basis,
+    size_t num_components,
+    size_t vector_dim
+){
+    float* result = (float*)malloc(num_components * sizeof(float));
+    for (size_t i = 0; i < num_components; ++i) {
+        result[i] = dotProduct(pca_basis[i], vector, vector_dim);
+    }
+    return result;
+}
+
+// Matriz de covarianza: C = (1/n) * (X^T * X)
+// Retorna matriz aplanada (row-major) de m x m
+float* calculateCovarianceMatrixC(
+    float** vectors,
+    size_t num_vectors,
+    size_t vector_dim
+){
+    size_t matrix_size = vector_dim * vector_dim;
+    float* cov_matrix = (float*)malloc(matrix_size * sizeof(float));
+
+    for (size_t i = 0; i < matrix_size; ++i) {
+        cov_matrix[i] = 0.0f;
+    }
+
+    // Acumulo productos externos
+    for (size_t k = 0; k < num_vectors; ++k) {
+        for (size_t i = 0; i < vector_dim; ++i) {
+            for (size_t j = 0; j < vector_dim; ++j) {
+                cov_matrix[i * vector_dim + j] += vectors[k][i] * vectors[k][j];
             }
         }
     }
-    
-    covariance_matrix /= n;
-    
-    return covariance_matrix;
+
+    // Divido por n
+    float inv_n = 1.0f / (float)num_vectors;
+    for (size_t i = 0; i < matrix_size; ++i) {
+        cov_matrix[i] *= inv_n;
+    }
+
+    return cov_matrix;
 }
 
+// Wrapper que retorna cv::Mat para compatibilidad con cv::eigen
+cv::Mat calculateCovarianceMatrix(
+    float** vectors,
+    size_t num_vectors,
+    size_t vector_dim
+){
+    float* cov_data = calculateCovarianceMatrixC(vectors, num_vectors, vector_dim);
 
-std::vector<std::vector<float>> calculatePCABasis(
-    const cv::Mat& covariance_matrix, 
-    const size_t num_components
-) {
-    /*
-    This function calculates the PCA basis vectors from the covariance matrix.
-    Parameters:
-    - covariance_matrix: The covariance matrix from which the PCA basis will be calculated.
-    - num_components: The number of PCA components to retain.
-    
-    Returns:
-    - A vector of vectors representing the PCA basis.
-    */
+    // Crear cv::Mat y copiar datos
+    cv::Mat cov_matrix(vector_dim, vector_dim, CV_32F);
+    memcpy(cov_matrix.data, cov_data, vector_dim * vector_dim * sizeof(float));
 
+    free(cov_data);
+    return cov_matrix;
+}
+
+float** calculatePCABasis(
+    const cv::Mat& covariance_matrix,
+    size_t num_components,
+    size_t* out_vector_dim
+){
     cv::Mat eigenvalues, eigenvectors;
     cv::eigen(covariance_matrix, eigenvalues, eigenvectors);
 
-    std::cout << "--> num_components: " << num_components << "\n";
-    
-    std::vector<std::vector<float>> pca_basis;
-    
-    for (int i = 0; i < num_components; ++i) {
-        std::vector<float> component;
+    *out_vector_dim = eigenvectors.rows;
+
+    float** pca_basis = (float**)malloc(num_components * sizeof(float*));
+    for (size_t i = 0; i < num_components; ++i) {
+        pca_basis[i] = (float*)malloc(eigenvectors.rows * sizeof(float));
         for (int j = 0; j < eigenvectors.rows; ++j) {
-            component.push_back(eigenvectors.at<float>(j, i));
+            pca_basis[i][j] = eigenvectors.at<float>(j, static_cast<int>(i));
         }
-        pca_basis.push_back(component);
     }
-    
+
     return pca_basis;
 }
+
+// -------------------------------------------
+float* projectInto1D(const cv::Mat& image, size_t* out_size) {
+    CV_Assert(image.type() == CV_8UC1);
+    size_t size = image.rows * image.cols;
+    *out_size = size;
+
+    float* vector = (float*)malloc(size * sizeof(float));
+    size_t idx = 0;
+    for (int i = 0; i < image.rows; ++i) {
+        const uchar* rowPtr = image.ptr<uchar>(i);
+        for (int j = 0; j < image.cols; ++j) {
+            vector[idx++] = static_cast<float>(rowPtr[j]);
+        }
+    }
+    return vector;
+}
+
+float* extractHOG(const cv::Mat& image, size_t* out_size) {
+    cv::HOGDescriptor hog(
+        cv::Size(IMG_SIZE, IMG_SIZE),
+        cv::Size(HOG_BLOCK_SIZE, HOG_BLOCK_SIZE),
+        cv::Size(HOG_BLOCK_STRIDE, HOG_BLOCK_STRIDE),
+        cv::Size(HOG_CELL_SIZE, HOG_CELL_SIZE),
+        HOG_NBINS
+    );
+
+    cv::Mat resized;
+    if (image.cols != IMG_SIZE || image.rows != IMG_SIZE)
+        cv::resize(image, resized, cv::Size(IMG_SIZE, IMG_SIZE));
+    else
+        resized = image;
+
+    cv::Mat gray;
+    if (resized.channels() == 3)
+        cv::cvtColor(resized, gray, cv::COLOR_BGR2GRAY);
+    else
+        gray = resized;
+
+    std::vector<float> descriptors;
+    hog.compute(gray, descriptors);
+
+    *out_size = descriptors.size();
+    float* result = (float*)malloc(descriptors.size() * sizeof(float));
+    memcpy(result, descriptors.data(), descriptors.size() * sizeof(float));
+    return result;
+}
+

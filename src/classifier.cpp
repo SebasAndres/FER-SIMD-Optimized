@@ -1,175 +1,148 @@
 #include "classifier.h"
 
-FaceClassifier::FaceClassifier() {
-    if (!face_detector.load("face_detection/haarcascade_frontalface_default.xml")) {
-        std::cerr << "Error loading Haar\n";
-        exit(1);
-    }
+// ============================================================================
+// FaceClassifier (base)
+// ============================================================================
 
-    // load mean vector
-    std::ifstream mean_file("data/mean_vector.csv");
-    if (!mean_file.is_open()) {
-        std::cout << "Could not load mean vector file\n";
-    }
-    else {
-        std::string line;
-        std::getline(mean_file, line);
-        std::stringstream ss(line);
-        std::string value;
-        while (std::getline(ss, value, ',')) {
-            mean_vector.push_back(std::stof(value));
-        }
-        mean_file.close();
-    }
-
-    // load PCA basis
-    std::ifstream pca_file("data/pca_basis.csv");
-    if (!pca_file.is_open()) {
-        std::cout << "Could not load PCA basis\n";
-    } else {
-        // load matrix
-        std::string line;
-        while (std::getline(pca_file, line)) {
-            std::vector<float> pca_vector;
-            std::stringstream ss(line);
-            std::string value;
-            while (std::getline(ss, value, ',')) {
-                pca_vector.push_back(std::stof(value));
-            }
-            pca_basis.push_back(pca_vector);
-        }
-
-        // calculate mean vectors (centroids) for each category
-        std::string pca_faces_dir = "data/pca_faces";
-        for (const auto& entry : fs::directory_iterator(pca_faces_dir)) {
-            if (entry.is_regular_file() && entry.path().extension() == ".csv") {
-                std::string filename = entry.path().filename().string();
-                // Extract category name from filename (e.g., "angry_faces.csv" -> "angry")
-                std::string name = filename.substr(0, filename.find("_faces.csv"));
-
-                std::vector<std::vector<float>> vectors = loadVectorsFromCsv(entry.path().string());
-                std::vector<float> category_mean_vector = calculateMeanVector(vectors);
-                categories_mean_vector[name] = category_mean_vector;
-            }
-        }
-    }
-}
-
-std::vector<std::vector<float>> FaceClassifier::loadVectorsFromCsv(const std::string& file_path) {
-    /*
-    This function loads vectors from a CSV file.
-    Parameters:
-    - file_path: The path to the CSV file containing vectors.
-    
-    Returns:
-    - A vector of vectors representing the loaded data.
-    */
-
-    std::vector<std::vector<float>> vectors;
-    std::ifstream file(file_path);
-
-    std::string line;
-    while (std::getline(file, line)) {
-        std::vector<float> vector;
-        std::stringstream ss(line);
-        std::string value;
-        while (std::getline(ss, value, ',')) {
-            vector.push_back(std::stof(value));
-        }
-        vectors.push_back(vector);
-    }
-
-    return vectors;
+FaceClassifier::FaceClassifier()
+    : mean_vector(nullptr), mean_vector_dim(0),
+      pca_basis(nullptr), pca_num_components(0), pca_vector_dim(0)
+{
+    loadMeanVector();
+    loadPCABasis();
 }
 
 FaceClassifier::~FaceClassifier() {
+    if (mean_vector) free(mean_vector);
+    if (pca_basis) freeMatrix(pca_basis, pca_num_components);
 }
 
+void FaceClassifier::loadMeanVector() {
+    int rows, cols;
+    float* data = csv::readMatrixRaw("../data/processed/mean_vector.csv", rows, cols);
+    if (!data) {
+        std::cerr << "Error: No se pudo cargar el vector medio\n";
+        return;
+    }
+    mean_vector = data;
+    mean_vector_dim = cols;
+}
 
-std::vector<float> FaceClassifier::vectorizeFace(const cv::Mat& face_img) {
-    /*
-    This function vectorizes a face image using HOG (Histogram of Oriented Gradients).
-    It converts the image to grayscale, resizes it to a fixed size, and computes the HOG features.    
+void FaceClassifier::loadPCABasis() {
+    int rows, cols;
+    float* data = csv::readMatrixRaw("../data/processed/pca_basis.csv", rows, cols);
+    if (!data) {
+        std::cerr << "Error: No se pudo cargar la base PCA\n";
+        return;
+    }
 
-    Parameters: 
-    - face_img: The input face image in BGR format.
-    */
+    pca_num_components = rows;
+    pca_vector_dim = cols;
 
-    // [1] Resize the image to a fixed size
+    pca_basis = (float**)malloc(rows * sizeof(float*));
+    for (int i = 0; i < rows; ++i) {
+        pca_basis[i] = (float*)malloc(cols * sizeof(float));
+        memcpy(pca_basis[i], data + i * cols, cols * sizeof(float));
+    }
+    free(data);
+}
+
+float* FaceClassifier::vectorizeFace(const cv::Mat& face_img) {
+    // Resize a tamaño estándar
     cv::Mat resized_face;
-    cv::resize(face_img, resized_face, cv::Size(PROCESSED_IMG_SIZE, PROCESSED_IMG_SIZE));
+    cv::resize(face_img, resized_face, cv::Size(IMG_SIZE, IMG_SIZE));
 
-    // [2] Convert the image to grayscale (if it's not already)
+    // Conversión a blanco y negro
     cv::Mat bn_face;
-    cvtColor(resized_face, bn_face, cv::COLOR_BGR2GRAY);
+    if (resized_face.channels() == 3) {
+        cvtColor(resized_face, bn_face, cv::COLOR_BGR2GRAY);
+    } else {
+        bn_face = resized_face;
+    }
 
-    // [3] Plain image into 1D vector
-    std::vector<float> vector = projectInto1D(bn_face);
+    // Ecualización de histograma
+    cv::equalizeHist(bn_face, bn_face);
 
-    // [4] Substract the means    
-    std::vector<float> vector_normalized = centerVector(vector, this->mean_vector); 
+    // Extracción de features HOG
+    size_t hog_size;
+    float* hog_features = extractHOG(bn_face, &hog_size);
 
-    // [5] Project vector into PCA space
-    std::vector<float> result = projectIntoPCA(vector, this->pca_basis);
+    // Restar vector medio
+    float* centered = centerVector(hog_features, mean_vector, hog_size);
+    free(hog_features);
+
+    // Proyección PCA
+    float* result = projectIntoPCA(centered, pca_basis, pca_num_components, pca_vector_dim);
+    free(centered);
 
     return result;
 }
 
+// ============================================================================
+// IMPL: CentroidClassifier
+// ============================================================================
 
-void FaceClassifier::detectFaces(const cv::Mat& frame, std::vector<cv::Rect>& faces) {
-    /*
-    This function detects faces in a given frame using a Haar Cascade classifier.
-    It converts the frame to grayscale and applies the face detection algorithm.
-
-    Parameters:
-    - frame: The input image frame in BN format.
-    - faces: A vector to store the detected face rectangles.
-    */
-
-    face_detector.detectMultiScale(frame, faces);
+CentroidClassifier::CentroidClassifier() : FaceClassifier(), centroid_dim(PCA_DIM) {
+    loadCategoryCentroids();
 }
 
+CentroidClassifier::~CentroidClassifier() {
+    for (auto& [label, centroid] : category_centroids) {
+        if (centroid) free(centroid);
+    }
+}
 
-std::string FaceClassifier::runClassification(std::vector<float> face_vector) {
-    /*
-    This function runs the classification of a face vector using the KNN algorithm.
-    This could run parallel to speed up the classification process using SIMD.
+void CentroidClassifier::loadCategoryCentroids() {
+    std::string pca_faces_dir = "../data/processed/pca_faces";
+    for (const auto& category : EMOTION_CATEGORIES) {
+        std::string file_path = pca_faces_dir + "/" + category + "_faces.csv";
 
-    Parameters:
-    - face_vector: A vector of features extracted from the face image.
-    Returns:
-    - The predicted face type as a string.
-    */
+        int rows, cols;
+        float* data = csv::readMatrixRaw(file_path, rows, cols);
+        if (!data || rows == 0) {
+            std::cerr << "Warning: No hay vectores para categoría " << category << "\n";
+            continue;
+        }
 
-    // k value (small odd number, e.g. 3 or 5)
+        float** vectors = (float**)malloc(rows * sizeof(float*));
+        for (int i = 0; i < rows; ++i) {
+            vectors[i] = data + i * cols;
+        }
+
+        float* centroid = calculateMeanVector(vectors, rows, cols);
+        category_centroids[category] = centroid;
+        centroid_dim = cols;
+
+        free(vectors);  
+        free(data);
+
+        std::cout << "  Cargado centroide: " << category << " (" << rows << " vectores)\n";
+    }
+}
+
+std::string CentroidClassifier::classifyFace(const cv::Mat& face_img) {
+    float* face_vector = vectorizeFace(face_img);
+
     constexpr int k = 3;
-
-    // Prepare neighbors {distance, label}
     std::priority_queue<std::pair<float, std::string>> knn_queue;
 
-    // Preload all mean vectors per category
-    // categories_mean_vector: map<label, mean_vector>
-
-    for (const auto& [label, mean_vec] : this->categories_mean_vector) {
-        float dist = euclideanDistanceASM(face_vector.data(), mean_vec.data(), face_vector.size());
-        knn_queue.push({-dist, label}); // use negative distance for min-heap
+    for (const auto& [label, centroid] : category_centroids) {
+        float dist = euclideanDistance(face_vector, centroid, centroid_dim);
+        knn_queue.push({-dist, label});
     }
 
-    // Gather top-k nearest neighbors
     std::vector<std::string> neighbors;
-    int n = std::min(k, (int)this->categories_mean_vector.size());
+    int n = std::min(k, (int)category_centroids.size());
     for (int i = 0; i < n && !knn_queue.empty(); ++i) {
         neighbors.push_back(knn_queue.top().second);
         knn_queue.pop();
     }
 
-    // Majority vote
     std::map<std::string, int> label_count;
     for (const std::string& label : neighbors) {
         label_count[label]++;
     }
 
-    // Find most frequent label (may break ties arbitrarily)
     std::string predicted = "";
     int max_count = 0;
     for (const auto& [label, count] : label_count) {
@@ -179,20 +152,134 @@ std::string FaceClassifier::runClassification(std::vector<float> face_vector) {
         }
     }
 
+    free(face_vector);
     return predicted.empty() ? "unknown" : predicted;
 }
 
+// ============================================================================
+// IMPL: IVFClassifier (KNN real con índice IVF)
+// ============================================================================
 
-std::string FaceClassifier::classifyFace(const cv::Mat& face_img) {
-    /*
-    This function classifies a face image by first vectorizing it and then running the classification.
-    Parameters:
-    - face_img: The input face image in BGR format.
-    Returns:
-    - The predicted face type as a string.
-    */
+IVFClassifier::IVFClassifier() : FaceClassifier(),
+    centroids(nullptr), vectors(nullptr), cluster_offsets(nullptr), labels(nullptr),
+    num_clusters(0), num_vectors(0), dim(PCA_DIM), nprobe(20), k(5)
+{
+    loadIVFIndex();
+}
 
-    std::vector<float> face_vector = vectorizeFace(face_img);
-    std::string face_type = runClassification(face_vector);
-    return face_type;
+IVFClassifier::~IVFClassifier() {
+    if (centroids) std::free(centroids);
+    if (vectors) std::free(vectors);
+    if (cluster_offsets) delete[] cluster_offsets;
+    if (labels) delete[] labels;
+}
+
+void IVFClassifier::loadIVFIndex() {
+    std::cout << "Cargando índice IVF...\n";
+
+    // Cargo centroides [C x D]
+    int c_rows, c_cols;
+    centroids = csv::readMatrixRaw("../data/processed/ivf/centroids.csv", c_rows, c_cols);
+    if (!centroids) {
+        std::cerr << "Error: No se pudo cargar centroids.csv\n";
+        return;
+    }
+    num_clusters = c_rows;
+    dim = c_cols;
+
+    // Cargo vectores ordenados por cluster [N x D]
+    int v_rows, v_cols;
+    vectors = csv::readMatrixRaw("../data/processed/ivf/vectors.csv", v_rows, v_cols);
+    if (!vectors) {
+        std::cerr << "Error: No se pudo cargar vectors.csv\n";
+        return;
+    }
+    num_vectors = v_rows;
+
+    // Cargo cluster_offsets [C+1]
+    int o_count;
+    cluster_offsets = csv::readIntArray("../data/processed/ivf/cluster_offsets.csv", o_count);
+    if (!cluster_offsets) {
+        std::cerr << "Error: No se pudo cargar cluster_offsets.csv\n";
+        return;
+    }
+
+    // Cargo labels ordenados [N]
+    int l_count;
+    labels = csv::readIntArray("../data/processed/ivf/labels.csv", l_count);
+    if (!labels) {
+        std::cerr << "Error: No se pudo cargar labels.csv\n";
+        return;
+    }
+
+    std::cout << "  Índice IVF cargado:\n";
+    std::cout << "    - Clusters: " << num_clusters << "\n";
+    std::cout << "    - Vectores: " << num_vectors << "\n";
+    std::cout << "    - Dimensiones: " << dim << "\n";
+}
+
+std::string IVFClassifier::classifyFace(const cv::Mat& face_img) {
+    float* face_vector = vectorizeFace(face_img);
+
+    // [1] Encuentro los nprobe clusters más cercanos
+    std::priority_queue<
+        std::pair<float, int>,
+        std::vector<std::pair<float, int>>,
+        std::greater<std::pair<float, int>>
+    > centroids_heap;
+    for (int c = 0; c < num_clusters; c++) {
+        float* cluster_centroid = centroids + c * dim;
+        float distance = euclideanDistance(face_vector, cluster_centroid, dim);
+        centroids_heap.push({distance, c});
+    }
+    std::vector<int> target_clusters;
+    for (int r = 0; r < nprobe && !centroids_heap.empty(); r++) {
+        target_clusters.push_back(centroids_heap.top().second);
+        centroids_heap.pop();
+    }
+
+    // [2] Busco solo en los vectores de los nprobe clusters 
+    std::priority_queue<
+        std::pair<float, int>,
+        std::vector<std::pair<float, int>>,
+        std::greater<std::pair<float, int>>
+    > distances;
+    for (int c_id : target_clusters) {
+        int start = cluster_offsets[c_id];
+        int end = cluster_offsets[c_id + 1];
+
+        for (int i = start; i < end; i++) {
+            int reduced_label = labels[i];
+            if (reduced_label < 0) continue;
+            float distance = euclideanDistance(face_vector, vectors + i * dim, dim);
+            distances.push({distance, reduced_label});
+        }
+    }
+
+    // [3] Extraigo los k vecinos más cercanos y 
+    //  voto ponderado por distancia.
+    float votes[NUM_EMOTIONS] = {0.0f};
+    std::vector<std::pair<float, int>> neighbors;
+    for (int j = 0; j < k && !distances.empty(); j++) {
+        neighbors.push_back(distances.top());
+        distances.pop();
+    }
+    for (int j = 0; j < (int)neighbors.size(); j++) {
+        int category_label = neighbors[j].second;
+        float dist = neighbors[j].first;
+        float weight = 1.0f / (dist + 1e-6f);
+        votes[category_label] += weight;
+    }
+
+    float max_weight = -1.0f;
+    int max_voted_category = 0;
+    for (int w = 0; w < NUM_EMOTIONS; w++) {
+        if (votes[w] > max_weight) {
+            max_weight = votes[w];
+            max_voted_category = w;
+        }
+    }
+
+    free(face_vector);
+    return EMOTION_CATEGORIES[max_voted_category];
 }
