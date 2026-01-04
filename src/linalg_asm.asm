@@ -1,11 +1,17 @@
+section .data
+    mask_1 dd 1.0
+
 section .text
 
 extern malloc
+extern calloc
 
 global euclideanDistanceASM
 global centerVectorASM
 global calculateMeanVectorASM
 global dotProductASM
+
+SIZE_POINTER EQU 8
 
 euclideanDistanceASM:
     ; float euclideanDistanceASM(
@@ -62,11 +68,8 @@ euclideanDistanceASM:
         haddps xmm1, xmm1
         haddps xmm1, xmm1
 
-        ; vacio los bits superiores de xmm1
-        movss xmm1, xmm1         
-
         ; sumamos al acumulador
-        addps xmm15, xmm1
+        addss xmm15, xmm1
 
         ; siguiente iteración
         inc r13
@@ -158,7 +161,166 @@ centerVectorASM:
     ret    
 
 dotProductASM:
+    ; float dotProductASM(
+    ;     const float* vec1,
+    ;     const float* vec2,
+    ;     size_t length
+    ; )
+    ; 
+    ; Argumentos:
+    ;     rdi = vec1, 
+    ;     rsi = vec2
+    ;     rdx = length
+    
+    ;prólogo
+    push rbp
+    mov rbp, rsp
+
+    ; guardo registros no volátiles
+    ; RBX, RBP, R12, R13, R14 y R15
+    push r12
+    push r13
+    push r14
+    push r15      
+    push rbx 
+    sub rsp, 8
+
+    ; contador del loop
+    xor rcx, rcx
+    xor r9, r9
+    shr rdx, 2 
+
+    ; output
+    pxor xmm0, xmm0
+
+    .loop:
+        movdqu xmm1, [rdi + r9]
+        movdqu xmm2, [rsi + r9]
+
+        mulps xmm1, xmm2
+        addps xmm0, xmm1
+
+        add r9, 16
+        inc rcx
+        cmp rcx, rdx
+        jne .loop
+
+    ; al final hago la suma total
+    haddps xmm0, xmm0
+    haddps xmm0, xmm0
+
+    ; recupero registros no volátiles 
+    add rsp, 8
+    pop rbx
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+
+    ;epílogo
+    pop rbp
     ret
 
 calculateMeanVectorASM:
+    ; float* calculateMeanVectorASM(
+    ;     float** vectors,
+    ;     size_t num_vectors,
+    ;     size_t vector_dim
+    ; )
+    ; Argumentos:
+    ;     rdi = vectors, 
+    ;     rsi = num_vectors
+    ;     rdx = vector_dim
+ 
+    ;prólogo
+    push rbp
+    mov rbp, rsp
+
+    ; guardo registros no volátiles
+    ; RBX, RBP, R12, R13, R14 y R15
+    push r12
+    push r13
+    push r14
+    push r15      
+    push rbx 
+    sub rsp, 8
+
+    ; guardo los argumentos
+    mov r12, rdi ; vectors
+    mov r13, rsi ; num_vectors
+    mov r14, rdx ; vector_dim
+
+    ; pido memoria para la respuesta
+    ; un vector de floats de dimension vector_dim
+    mov rdi, rdx
+    mov rsi, 4
+    call calloc ; output en rax
+
+    ; cantidad de iteraciones en loop vectores
+    mov rbx, r13 
+
+    ; cantidad de iteraciones por vector
+    shr r14, 2
+
+    ; i
+    xor r9, r9
+
+    .loop_vectors:  
+        ;vectors[i]
+        mov r10, [r12 + r9 * SIZE_POINTER]        
+
+        ;j
+        xor r8, r8
+        xor rcx, rcx
+        .loop_inside_vector:
+
+            ; vectors[i,j]
+            movdqu xmm1, [r10 + rcx]     
+
+            ; acumulado
+            movdqu xmm0, [rax + rcx]
+            
+            ; nuevo acumulado
+            addps xmm0, xmm1
+            movdqu [rax + rcx], xmm0 
+            
+            ; actualizo iteradores del loop interno
+            inc r8
+            add rcx, 16
+            cmp r8, r14
+            jne .loop_inside_vector
+
+        ; actualizo iteradores del loop externo
+        inc r9 
+        cmp r9, rbx 
+        jne .loop_vectors
+
+    ; armo un xmm con 4 floats que valen 1/num_vectors
+    cvtsi2ss xmm4, r13 
+    movss xmm5, [mask_1]
+    divss xmm5, xmm4 
+    shufps xmm5, xmm5, 0 
+
+    ; divido el vector resultante por num_vectors
+    xor r8, r8
+    xor rcx, rcx
+    .loop_inside_vector_div:
+        movdqu xmm0, [rax + rcx]
+        mulps xmm0, xmm5
+        movdqu [rax + rcx], xmm0
+        inc r8 
+        add rcx, 16
+        cmp r8, r14
+        jne .loop_inside_vector_div
+    
+    ; recupero registros no volátiles 
+    add rsp, 8
+    pop rbx
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+
+    ;epílogo
+    pop rbp
     ret

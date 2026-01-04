@@ -25,7 +25,7 @@ vectorizer: initialize_vectorizer.cpp $(COMMON_SRCS) $(COMMON_OBJS)
 	$(CXX) $(CAMARA_CXXFLAGS) initialize_vectorizer.cpp $(COMMON_SRCS) $(COMMON_OBJS) -o initialize_vectorizer $(CAMARA_LDFLAGS)
 	LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:$(LD_LIBRARY_PATH) 
 
-init_vectorizer:
+init_vectorizer: vectorizer
 	./initialize_vectorizer
 
 app: app.cpp $(COMMON_SRCS) $(COMMON_OBJS)
@@ -34,12 +34,12 @@ app: app.cpp $(COMMON_SRCS) $(COMMON_OBJS)
 run: app
 	LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:$(LD_LIBRARY_PATH) ./app
 
-full_pipeline:
+pipeline:
 	@echo "Iniciando pipeline..."
 	make clean
 	make download_dataset
-	make initialize_vectorizer
-	make run_application
+	make init_vectorizer
+	make run
 	@echo "Pipeline completado."
 
 
