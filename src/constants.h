@@ -1,7 +1,7 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-#define USE_ASM_IMP 0
+#define USE_ASM_IMP 1
 
 #define IMG_SIZE 48
 #define IMG_PIXELS (IMG_SIZE * IMG_SIZE)  // 2304

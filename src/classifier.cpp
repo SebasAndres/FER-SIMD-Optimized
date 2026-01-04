@@ -59,8 +59,6 @@ float* FaceClassifier::vectorizeFace(const cv::Mat& face_img) {
     } else {
         bn_face = resized_face;
     }
-
-    // Ecualización de histograma
     cv::equalizeHist(bn_face, bn_face);
 
     // Extracción de features HOG
