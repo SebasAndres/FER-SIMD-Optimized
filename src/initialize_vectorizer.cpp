@@ -1,9 +1,18 @@
-/* Este script procesa el dataset para generar:
- * 1. Vector medio (mean_vector.csv)
- * 2. Base PCA (pca_basis.csv)
- * 3. Vectores PCA por categoría (pca_faces/*.csv)
- * 4. Un índice IVF para búsqueda eficiente 
+/* 
+Este script procesa el dataset para generar:
+1. Vector medio (data/processed/mean_vector.csv)
+2. Base PCA (data/processed/pca_basis.csv)
+3. Vectores PCA por categoría (data/processed/pca_faces/*.csv)
+4. Un índice IVF para búsqueda eficiente:
+    - data/processed/ivf/centroids.csv 
+    - data/processed/ivf/cluster_offsets.csv
+    - data/processed/ivf/labels.csv 
+    - data/processed/ivf/vectors.csv  
 */
+
+#include <random>
+#include <numeric>
+#include <algorithm>
 
 #include "classifier.h"
 #include "linalg.h"
@@ -11,12 +20,7 @@
 #include "types.h"
 #include "constants.h"
 
-#include <random>
-#include <numeric>
-#include <algorithm>
-
 std::vector<float> getFaceHOGVector(cv::Mat face_img) {
-    // Extrae las HOG features dado un frame de un rostro
     cv::Mat resized_face;
     cv::resize(
         face_img,
@@ -25,7 +29,6 @@ std::vector<float> getFaceHOGVector(cv::Mat face_img) {
     );
     cv::Mat equalized;
     cv::equalizeHist(resized_face, equalized);
-
     size_t hog_size;
     float* hog_ptr = extractHOG(equalized, &hog_size);
     std::vector<float> result(hog_ptr, hog_ptr + hog_size);
@@ -43,7 +46,6 @@ void extractFacesFromDirectory(
     Por cada cara detectada aplica la vectorización y la acumula en 
     output_vectors.
     */
-
     cv::CascadeClassifier face_detector;
     if (!face_detector.load("face_detection/haarcascade_frontalface_default.xml")) {
         std::cerr << "Error loading Haar\n";
@@ -89,8 +91,8 @@ void collectAllFaces1D(
     el parámetro inout all_faces y guardardolos en una carpeta por
     categoría.
     */
-    std::cout << "\n[Paso 1] Recolectando caras del dataset...\n";
 
+    std::cout << "\n[Paso 1] Recolectando caras del dataset...\n";
     csv::ensureDirectoryExists("../data/processed/faces");
 
     for (const auto& category : EMOTION_CATEGORIES) {
@@ -123,7 +125,7 @@ PCAResult computeAndSavePCA(
     size_t num_vectors = faces.size();
     size_t vector_dim = faces[0].size();
 
-    // Convertir a float**
+    // Pasaje a float**
     float** faces_ptr = (float**)malloc(num_vectors * sizeof(float*));
     for (size_t i = 0; i < num_vectors; ++i) {
         faces_ptr[i] = faces[i].data();
@@ -134,7 +136,7 @@ PCAResult computeAndSavePCA(
     float* mean_vec = calculateMeanVector(faces_ptr, num_vectors, vector_dim);
     csv::writeVectorRaw(mean_vec, vector_dim, "../data/processed/mean_vector.csv");
 
-    // [2] Centrar vectores
+    // [2] Centrado de vectores
     std::cout << "  Centrando vectores...\n";
     float** centered = centerVectors(faces_ptr, mean_vec, num_vectors, vector_dim);
 
@@ -147,8 +149,9 @@ PCAResult computeAndSavePCA(
     size_t pca_vector_dim;
     float** pca_basis = calculatePCABasis(cov_matrix, num_components, &pca_vector_dim);
     csv::writeMatrixRaw2D(pca_basis, num_components, pca_vector_dim, "../data/processed/pca_basis.csv");
+    std::cout << "  PCA guardado en data/processed/pca_basis.csv\n";
 
-    // Convertir resultados a std::vector para PCAResult
+    // Convierto resultados a std::vector para PCAResult
     std::vector<float> mean_vec_result(mean_vec, mean_vec + vector_dim);
     std::vector<std::vector<float>> pca_basis_result(num_components);
     for (int i = 0; i < num_components; ++i) {
@@ -160,7 +163,6 @@ PCAResult computeAndSavePCA(
     freeMatrix(centered, num_vectors);
     freeMatrix(pca_basis, num_components);
 
-    std::cout << "  PCA guardado en data/processed/pca_basis.csv\n";
     return {pca_basis_result, mean_vec_result};
 }
 
@@ -176,7 +178,7 @@ void projectFacesToPCA(
     size_t num_components = pca_basis.size();
     size_t pca_vector_dim = pca_basis[0].size();
 
-    // Convertir pca_basis a float**
+    // Convierto pca_basis a float**
     float** pca_basis_ptr = (float**)malloc(num_components * sizeof(float*));
     for (size_t i = 0; i < num_components; ++i) {
         pca_basis_ptr[i] = (float*)pca_basis[i].data();
@@ -185,16 +187,12 @@ void projectFacesToPCA(
     auto pca_vectorizer = [&](cv::Mat face) -> std::vector<float> {
         cv::Mat equalized;
         cv::equalizeHist(face, equalized);
-
         size_t hog_size;
         float* hog_ptr = extractHOG(equalized, &hog_size);
-
         float* centered = centerVector(hog_ptr, mean_vector.data(), hog_size);
         free(hog_ptr);
-
         float* projected = projectIntoPCA(centered, pca_basis_ptr, num_components, pca_vector_dim);
         free(centered);
-
         std::vector<float> result(projected, projected + num_components);
         free(projected);
         return result;
@@ -203,8 +201,8 @@ void projectFacesToPCA(
     for (const auto& category : EMOTION_CATEGORIES) {
         std::string category_path = dataset_path + "/" + category;
         if (!fs::exists(category_path)) continue;
-
         std::vector<std::vector<float>> pca_faces;
+
         extractFacesFromDirectory(category_path, pca_vectorizer, pca_faces);
 
         std::string output_path = "../data/processed/pca_faces/" + category + "_faces.csv";
@@ -216,10 +214,10 @@ void projectFacesToPCA(
 }
 
 void trainKMeans(
-    float* vectors,         // Todos los vectores N disponibles. 
-    int num_vectors,        // N: número de vectores.
-    float* centroids,       // [C x D] output: centroides.
-    int* assignments,       // [N] output: cluster de cada vector.
+    float* vectors,          
+    int num_vectors,        
+    float* centroids,       
+    int* assignments,       
     const IVFConfig& config
 ) {
     /* Calculo los `config.num_clusterss` centroides a partir de todos
@@ -268,21 +266,18 @@ void trainKMeans(
             int c = assignments[i];
             float* vector = vectors + i * D;
             float* centroid = centroids + c * D;
-
-            for (int d = 0; d < D; d++) {
+            for (int d = 0; d < D; d++) 
                 centroid[d] += vector[d];
-            }
             num_vectors_per_centroid[c]++;
         }
 
-        // Divido por cantidad en cada centroide para obtener nuevos
-        // centroides
+        // Divido por cantidad en cada centroide 
+        // para obtener nuevos centroides
         for (int c = 0; c < C; c++) {
             if (num_vectors_per_centroid[c] > 0) {
                 float* centroid = centroids + c * D;
-                for (int d = 0; d < D; d++) {
+                for (int d = 0; d < D; d++)
                     centroid[d] /= num_vectors_per_centroid[c];
-                }
             }
         }
     }
@@ -294,29 +289,25 @@ LabeledVectors subsampleHappy(const LabeledVectors& data, float ratio) {
     // Submuestreo de la clase mayoritaria (happy) para balancear el dataset
     std::cout << "  Aplicando submuestreo de happy (ratio " << ratio << ":1)...\n";
     std::vector<int> class_counts(NUM_EMOTIONS, 0);
-    for (int label : data.labels) {
+    for (int label : data.labels)
         class_counts[label]++;
-    }
     std::cout << "    Distribución original:\n";
-    for (int i = 0; i < NUM_EMOTIONS; i++) {
+    for (int i = 0; i < NUM_EMOTIONS; i++)
         std::cout << "      " << EMOTION_CATEGORIES[i] << ": " << class_counts[i] << "\n";
-    }
     int n_sad = class_counts[2];
     int n_happy_target = static_cast<int>(n_sad * ratio);
     n_happy_target = std::min(n_happy_target, class_counts[0]);  // no más que el original
     std::vector<std::vector<int>> indices_by_class(NUM_EMOTIONS);
-    for (size_t i = 0; i < data.labels.size(); i++) {
+    for (size_t i = 0; i < data.labels.size(); i++)
         indices_by_class[data.labels[i]].push_back(i);
-    }
     std::random_device rd;
     std::mt19937 gen(rd());
     std::shuffle(indices_by_class[0].begin(), indices_by_class[0].end(), gen);
     indices_by_class[0].resize(n_happy_target);
     std::vector<int> selected_indices;
     for (int c = 0; c < NUM_EMOTIONS; c++) {
-        for (int idx : indices_by_class[c]) {
+        for (int idx : indices_by_class[c])
             selected_indices.push_back(idx);
-        }
     }
     std::shuffle(selected_indices.begin(), selected_indices.end(), gen);
     LabeledVectors result;
@@ -327,13 +318,11 @@ LabeledVectors subsampleHappy(const LabeledVectors& data, float ratio) {
         result.labels.push_back(data.labels[idx]);
     }
     std::vector<int> new_counts(NUM_EMOTIONS, 0);
-    for (int label : result.labels) {
+    for (int label : result.labels)
         new_counts[label]++;
-    }
     std::cout << "    Distribución balanceada:\n";
-    for (int i = 0; i < NUM_EMOTIONS; i++) {
+    for (int i = 0; i < NUM_EMOTIONS; i++)
         std::cout << "      " << EMOTION_CATEGORIES[i] << ": " << new_counts[i] << "\n";
-    }
     std::cout << "    Total: " << result.vectors.size() << " vectores\n";
     return result;
 }
@@ -345,7 +334,7 @@ void buildIVFIndex(const IVFConfig& config) {
     std::cout << "  Cargando vectores PCA...\n";
     LabeledVectors raw_data = csv::readLabeledVectors("../data/processed/pca_faces", EMOTION_CATEGORIES);
 
-    // Submuestreao de happy para balancear clases
+    // Submuestreo de happy para balancear clases
     LabeledVectors balanced_data = subsampleHappy(raw_data, SUBSAMPLE_RATIO);
     
     // Convierto los vectores a memoria contigua
@@ -377,9 +366,9 @@ void buildIVFIndex(const IVFConfig& config) {
     // cluster_offset[c] = "índice en vectors del primer elemento del cluster c"
     int* cluster_offsets = new int[C + 1];
     cluster_offsets[0] = 0;
-    for (int c = 0; c < C; c++) {
+    for (int c = 0; c < C; c++)
         cluster_offsets[c + 1] = cluster_offsets[c] + cluster_sizes[c];
-    }
+
     // reordeno arrays
     float* vectors_sorted = (float*) malloc(sizeof(float) * N * D);
     int* labels_sorted = new int[N];
