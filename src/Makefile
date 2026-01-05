@@ -15,9 +15,6 @@ clean:
 	rm -f camara generate app initialize_vectorizer *.o
 	@echo "Clean completado."
 
-download_dataset: 
-	uv run python download_dataset.py
-
 linalg_asm.o: linalg_asm.asm
 	$(AS) $(ASFLAGS) linalg_asm.asm -o linalg_asm.o
 
@@ -34,13 +31,19 @@ app: app.cpp $(COMMON_SRCS) $(COMMON_OBJS)
 run: app
 	LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:$(LD_LIBRARY_PATH) ./app
 
-pipeline:
-	@echo "Iniciando pipeline..."
+full_pipeline:
+	@echo "Iniciando pipeline completo..."
 	make clean
-	make download_dataset
+	uv run python download_dataset.py
 	make init_vectorizer
 	make run
 	@echo "Pipeline completado."
 
+pipeline:
+	@echo "Iniciando pipeline completo..."
+	make clean
+	make init_vectorizer
+	make run
+	@echo "Pipeline completado."
 
 .PHONY: test

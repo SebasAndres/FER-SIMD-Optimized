@@ -57,11 +57,11 @@ Una vez recortada la imagen de la cara, para vectorizar esos píxeles realice di
 El sustento de esto es que para poder encontrar features distintivos de cada tipo de imagen, es útil asemejarlas en factores que nada tienen que ver con lo que queremos detectar, esto, las luces/iluminación del lugar de la imagen y el tamaño de la cara en la misma (1 a 3). Luego aplico una extracción de features HOG, de la cual luego profundizo más. Y finalmente aplico la proyección *PCA* para reducir el tamaño de los vectores de características que despues manipulo para computar la clasificación. Por defecto, dejé el `num_components` de PCA igual a 100, pero es configurable en `src/constants.h` (debe ser un multiplo de 4, para las optimizaciones que hice en SIMD posteriormente).
 
 ### Aplicación de PCA
-La motivación para implementar PCA vino por parte de mi reciente cursada de ALC. Apartir del estudio de las distintas descomposiciones de una matriz y cómo muestran estas propiedades inherentes de la misma, se puede estudiar la correlación entre componentes de un vector y colapsar aquellas que representen, en esencia, la misma información. 
+La motivación para implementar PCA vino por parte de mi reciente cursada de ALC (Métodos Numéricos). Apartir del estudio de las distintas descomposiciones de una matriz y cómo muestran estas propiedades inherentes de la misma, se puede estudiar la correlación entre componentes de un vector y colapsar aquellas que representen, en esencia, la misma información. 
 
 **Prop:** Un vector $y$ representado en una base $B$ puede escribirse en otra base $V$ a partir de un cambio de base $[y]_V = C_{BV}[y]_B$.
 
-Dado un vector feature de un rostro $x \in \mathbb{R}^{D}$, quiero proyectarlo a un subespacio $V_d = [v_1, ..., v_d]$ de dimension $d < D$, perdiendo la menor cantidad de información posible. Para medir la cantidad de información que pierdo uso una norma matricial entre la $X$ original y $\hat{X}$ una matriz que aproxima a $X$ pero de menor dimensión:
+Dado un vector feature de un rostro $x \in \mathbb{R}^{D}$, quiero proyectarlo a un subespacio definido por una base ortonormal $V_d = [v_1, ..., v_d]$ de dimension $d < D$, perdiendo la menor cantidad de información posible. Para medir la cantidad de información que pierdo uso una norma matricial entre la $X$ original y $\hat{X}$ una matriz que aproxima a $X$ pero de menor dimensión:
 
 $$\min_{\text{rank}(\hat{X})=d} \| X - \hat{X} \|_F = \
 \sum_{i=1}^{N} \| x_i - \hat{x}_i \|_2^2 \ 
@@ -70,7 +70,17 @@ $$
 
 Por definición la covarianza mide la dispersion alrededor del centro de los datos, entonces tengo que calcular antes un vector medio $\mu_ D$ y centrarlo antes de proyectar: $x-\mu_D$. En nuestro caso, los "datos" serían la matríz $X\in\mathbb{R}^{n \times D}$, con $n$ features de caras de dimension $D$ original.
 
-La reconstrucción $\hat{X}$ puede hacerse a partir de $\hat{x}_i = \mu_D + V_d y_i$ con $y_i = V_d^T(x_i - \mu_D) \in \mathbb{R}^d$. Siendo $V_d$ la matríz cuyas columnas son los $d$ autovectores principales de la matriz de covarianza $C = \frac{1}{N-1} \tilde{X}^T \tilde{X}$, donde $\tilde{X} = (X - \mathbf{1}\mu_D^T)$ .
+La reconstrucción $\hat{X}$ puede hacerse a partir de $\hat{x}_i = \mu_D + V_d y_i$ con $y_i = V_d^T(x_i - \mu_D) \in \mathbb{R}^d$. Siendo $V_d$ la matríz cuyas columnas son los $d$ autovectores principales de la matriz de covarianza $C = \frac{1}{N-1} \tilde{X}^T \tilde{X}$, donde $\tilde{X} = (X - \mathbf{1}\mu_D^T)$. Además como $C$ es simétrica definida positiva, vale por el teorema espectral que existe una descomposición $C = V_d \Lambda V_d^T$, donde:
+$V$ es una matriz ortogonal cuyas columnas son los autovectores de $C$ (direcciones principales),$\Lambda$ es una matriz diagonal que contiene los autovalores $\lambda_1 \ge \lambda_2 \ge \dots \ge \lambda_D \ge 0$ (varianza capturada en cada dirección).
+
+En síntesis, la transformación $f: \mathbb{R}^D \rightarrow V_d$ se define como:
+$$f(x_i) = V_d^T(x_i - \mu_D)$$
+
+Para lo cual necesito precomputar con todos los datos que tengo $X^{n \times D}$ los valores de:
+- $V_d$ a partir de la descomposición de $C$.
+- $\mu_D$ el vector medio de $X$.
+
+Esto lo hago en `init_vectorizer`.
 
 ## **Clasificación de caras**
 Dado que hay muchas imagenes en el dataset, no tiene sentido computar en cada clasificación todas las distancias euclidianas entre features de la cara detectada y el resto de caras del dataset. Esto sería muy complejo computacionalmente $\mathcal{O}(L*d)$, pues el costo de computar las distancias euclidianas entre dos vectores de tamaño $d$ es $\mathcal{O}(d)$.
