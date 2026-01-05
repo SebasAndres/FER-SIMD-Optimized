@@ -1,9 +1,5 @@
 #include "classifier.h"
 
-// ============================================================================
-// FaceClassifier (base)
-// ============================================================================
-
 FaceClassifier::FaceClassifier()
     : mean_vector(nullptr), mean_vector_dim(0),
       pca_basis(nullptr), pca_num_components(0), pca_vector_dim(0)
@@ -76,8 +72,6 @@ float* FaceClassifier::vectorizeFace(const cv::Mat& face_img) {
     return result;
 }
 
-// ============================================================================
-// IMPL: CentroidClassifier
 // ============================================================================
 
 CentroidClassifier::CentroidClassifier() : FaceClassifier(), centroid_dim(PCA_DIM) {
@@ -154,8 +148,6 @@ std::string CentroidClassifier::classifyFace(const cv::Mat& face_img) {
     return predicted.empty() ? "unknown" : predicted;
 }
 
-// ============================================================================
-// IMPL: IVFClassifier (KNN real con índice IVF)
 // ============================================================================
 
 IVFClassifier::IVFClassifier() : FaceClassifier(),

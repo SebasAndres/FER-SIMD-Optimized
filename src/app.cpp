@@ -1,19 +1,12 @@
 /* 
-* Script de la app del proyecto.
-* Abre una ventana donde se realiza una clasificacion RT
-* de las caras que detecta.
+Script de la app del proyecto.
+Abre una ventana donde se realiza una clasificacion RT de las caras que detecta.
 */
 
 #include <iostream>
 #include <opencv2/opencv.hpp>
 #include "classifier.h"
-
-#define FONT_LABELS cv::FONT_HERSHEY_SIMPLEX
-#define FONT_SCALE 0.8
-#define FONT_THICKNESS 2
-#define FONT_COLOR cv::Scalar(255, 0, 0)
-
-#define RECTANGLE_COLOR cv::Scalar(255, 0, 0)
+#include "constants.h"
 
 void test_camara(cv::VideoCapture& cap){
     if (!cap.isOpened()) {
