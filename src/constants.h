@@ -23,4 +23,11 @@ inline const std::vector<std::string> EMOTION_CATEGORIES = {
     "happy", "neutral", "sad"
 };
 
+#define FONT_LABELS cv::FONT_HERSHEY_SIMPLEX
+#define FONT_SCALE 0.8
+#define FONT_THICKNESS 2
+#define FONT_COLOR cv::Scalar(255, 0, 0)
+#define RECTANGLE_COLOR cv::Scalar(255, 0, 0)
+
+
 #endif

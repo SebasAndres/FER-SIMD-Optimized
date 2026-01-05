@@ -38,7 +38,6 @@ protected:
     void loadPCABasis();
 };
 
-// ============================================================================
 class CentroidClassifier : public FaceClassifier {
 public:
     CentroidClassifier();
@@ -53,7 +52,6 @@ private:
     void loadCategoryCentroids();
 };
 
-// ============================================================================
 class IVFClassifier : public FaceClassifier {
 public:
     IVFClassifier();
