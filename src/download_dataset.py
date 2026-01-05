@@ -1,10 +1,6 @@
 import kaggle
 import os
 import zipfile
-import numpy as np
-from tqdm import tqdm
-from PIL import Image
-import pandas as pd
 import shutil
 
 
@@ -22,7 +18,6 @@ def download_fer2013_dataset():
         # "surprise",
     }
 
-    # Emotion directories
     for label in emotion_labels:
         os.makedirs(os.path.join(output_dir, label), exist_ok=True)
 
@@ -36,16 +31,13 @@ def download_fer2013_dataset():
             unzip=False
         )
 
-        # Extract the zip file
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(output_dir)
         os.remove(zip_path)
 
-    # The msambare/fer2013 dataset contains train/test folders with images
     train_dir = os.path.join(output_dir, 'train')
     test_dir = os.path.join(output_dir, 'test')
 
-    # Dataset is already in image format, just need to move files
     for split_dir in [train_dir, test_dir]:
         for emotion_folder in os.listdir(split_dir):
             src_folder = os.path.join(split_dir, emotion_folder)
@@ -60,7 +52,6 @@ def download_fer2013_dataset():
                 if os.path.isfile(src_path):
                     os.rename(src_path, dst_path)
 
-    # Clean up train/test directories
     if os.path.exists(train_dir):
         shutil.rmtree(train_dir)
     if os.path.exists(test_dir):
