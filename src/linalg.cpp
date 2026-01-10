@@ -1,7 +1,6 @@
 #include "linalg.h"
 #include <cstdlib>
 
-// Distancia euclideana --------------------------
 float euclideanDistanceC(
     const float* vec1,
     const float* vec2,
@@ -27,7 +26,6 @@ float euclideanDistance(
     #endif
 }
 
-// Centrado de vectores -------------------------------
 float* centerVectorC(
     const float* vector,
     const float* mean_vector,
@@ -63,7 +61,6 @@ float** centerVectors(
     return result;
 }
 
-// Calcular vector medio ----------------------------
 float* calculateMeanVectorC(
     float** vectors,
     size_t num_vectors,
@@ -100,8 +97,6 @@ float* calculateMeanVector(
     #endif
 }
 
-// PCA ---------------------------------------
-
 float dotProductC(
     const float* vec1,
     const float* vec2,
@@ -126,13 +121,13 @@ float dotProduct(
     #endif
 }
 
-// Proyección PCA: result = pca_basis @ vector
 float* projectIntoPCAC(
     const float* vector,
     float** pca_basis,
     size_t num_components,
     size_t vector_dim
 ){
+    // Proyección PCA: result = pca_basis @ vector
     float* result = (float*)malloc(num_components * sizeof(float));
     for (size_t i = 0; i < num_components; ++i) {
         result[i] = dotProductC(pca_basis[i], vector, vector_dim);
@@ -222,7 +217,6 @@ float** calculatePCABasis(
     return pca_basis;
 }
 
-// -------------------------------------------
 float* projectInto1D(const cv::Mat& image, size_t* out_size) {
     CV_Assert(image.type() == CV_8UC1);
     size_t size = image.rows * image.cols;

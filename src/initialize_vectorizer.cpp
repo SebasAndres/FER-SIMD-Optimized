@@ -20,29 +20,14 @@ Este script procesa el dataset para generar:
 #include "types.h"
 #include "constants.h"
 
-std::vector<float> getFaceHOGVector(cv::Mat face_img) {
-    cv::Mat resized_face;
-    cv::resize(
-        face_img,
-        resized_face,
-        cv::Size(IMG_SIZE, IMG_SIZE)
-    );
-    cv::Mat equalized;
-    cv::equalizeHist(resized_face, equalized);
-    size_t hog_size;
-    float* hog_ptr = extractHOG(equalized, &hog_size);
-    std::vector<float> result(hog_ptr, hog_ptr + hog_size);
-    free(hog_ptr);
-    return result;
-}
-
 
 void extractFacesFromDirectory(
     const std::string& dir_path,
     std::function<std::vector<float>(cv::Mat)> vectorizer,
     std::vector<std::vector<float>>& output_vectors
 ) {
-    /* Dado un directorio con imagenes, las recorre y detecta caras.
+    /* 
+    Dado un directorio con imagenes, las recorre y detecta caras.
     Por cada cara detectada aplica la vectorización y la acumula en 
     output_vectors.
     */
@@ -82,14 +67,55 @@ void extractFacesFromDirectory(
     }
 }
 
+std::vector<float> getFaceHOGVector(cv::Mat face_img) {
+    /* 
+    Computa el vector x in R^{n x D} dado el frame de una 
+    cara. No aplica PCA. Sirve para el recorrido inicial
+    del dataset.
+
+    Parámetros
+    -------------
+    - face_img : Cv::Mat
+        Frame con un rostro detectado.
+
+    Salida
+    --------------
+    - features: vector<float>   
+        Vector de features de face_imv.
+    */
+    cv::Mat resized_face;
+    cv::resize(
+        face_img,
+        resized_face,
+        cv::Size(IMG_SIZE, IMG_SIZE)
+    );
+    cv::Mat equalized;
+    cv::equalizeHist(resized_face, equalized);
+    size_t hog_size;
+    float* hog_ptr = extractHOG(equalized, &hog_size);
+    std::vector<float> result(hog_ptr, hog_ptr + hog_size);
+    free(hog_ptr);
+    return result;
+}
+
+
 void collectAllFaces1D(
     const std::string& dataset_path,
     std::vector<std::vector<float>>& all_faces
 ) {
-    /* Por cada tipo de cara en el dataset, obtener rostros y 
-    vectorizarlos con HOG, devolviendolos de forma unificada en
-    el parámetro inout all_faces y guardardolos en una carpeta por
-    categoría.
+    /*
+    Por cada tipo de cara en el dataset, hay un archivo desde
+    <dataset_path>/*_obtiene las caras y 
+    las vectoriza 
+
+    Parámetros:
+    ----------
+    - dataset_path: str
+        Contiene la ruta relativa desde donde se pueden encontrar los 
+        archivos *_faces.csv.
+    - all_faces: vector<vector<float>>
+        Es el arreglo con todos los vectores feature para cada cara 
+        procesada desde la ruta pasada en dataset_path.
     */
 
     std::cout << "\n[Paso 1] Recolectando caras del dataset...\n";
@@ -172,18 +198,34 @@ void projectFacesToPCA(
     const std::vector<std::vector<float>>& pca_basis,
     const std::vector<float>& mean_vector
 ) {
+    /* Proceso todo el dataset aplicando en la vectorización PCA con 
+    los datos precomputados.
+
+    Parámetros:
+    ----------
+    - dataset_path:
+        Path donde están las carpetas con las imagenes de cada categoría.
+    - pca_basis:
+        Son los vectores que forman la base de V_d sobre la cual se proyecta en PCA.
+    - mean_vector:
+        Es el vector medio del dataset, tiene que ser restado a todos los vectores antes 
+        de proyectar en PCA. 
+
+    El output son carpetas en data/processed/pca_faces con los vectores procesados para cada 
+    tipo de cara
+    */
     std::cout << "\n[Paso 3] Proyectando caras a espacio PCA...\n";
     csv::ensureDirectoryExists("../data/processed/pca_faces");
 
     size_t num_components = pca_basis.size();
     size_t pca_vector_dim = pca_basis[0].size();
 
-    // Convierto pca_basis a float**
+    // Convierto pca_basis a float** para implementaciones en assembly
     float** pca_basis_ptr = (float**)malloc(num_components * sizeof(float*));
-    for (size_t i = 0; i < num_components; ++i) {
+    for (size_t i = 0; i < num_components; ++i)
         pca_basis_ptr[i] = (float*)pca_basis[i].data();
-    }
 
+    // Defino una lambda que vectoriza una face dada ya usando PCA
     auto pca_vectorizer = [&](cv::Mat face) -> std::vector<float> {
         cv::Mat equalized;
         cv::equalizeHist(face, equalized);
@@ -198,6 +240,8 @@ void projectFacesToPCA(
         return result;
     };
 
+    // Reaplico el procesamiento en todos los tipos de caras y guardo un csv para cada 
+    // categoría con todos sus features procesados con PCA
     for (const auto& category : EMOTION_CATEGORIES) {
         std::string category_path = dataset_path + "/" + category;
         if (!fs::exists(category_path)) continue;
@@ -220,8 +264,10 @@ void trainKMeans(
     int* assignments,       
     const IVFConfig& config
 ) {
-    /* Calculo los `config.num_clusterss` centroides a partir de todos
-    los vectores, aplicando iteraciones de KMeans. */
+    /* 
+    Calculo los `config.num_clusters` centroides a partir de todos
+    los vectores, aplicando iteraciones de KMeans. 
+    */
 
     int D = config.dim;
     int C = config.num_clusters;
@@ -328,11 +374,33 @@ LabeledVectors subsampleHappy(const LabeledVectors& data, float ratio) {
 }
 
 void buildIVFIndex(const IVFConfig& config) {
+    /* Construye los archivos necesarios para poder ejecutar una busqueda
+    vectorial eficiente por similitud.
+    
+    Parámetros:
+    -------------
+    - config: 
+        Es un struct que contiene informacion sobre:
+            El número de clusters a computar (C)
+            La dimensión de PCA que tienen los features previamente computados (D)
+            La cantidad de iteraciones que se tiene que ejecutar KMeans computando los centroides (kmeans_iters)
+            El numero de clusters sobre los cuales agrupar 
+            El numero de vecinos en KMeans.
+    
+    El resultado son los archivos:
+        - /data/processed/ivf/centroids.csv: los C centroides.
+        - /data/processed/ivf/vectors.csv: los vectores ordenados por categoría
+        - /data/processed/ivf/cluster_offsets.csv: los offsets de cada categoría en vectors.
+        - /data/processed/ivf/labels.csv: los labels de cada vector.
+    */
     std::cout << "\n[Paso 4] Construyendo índice IVF...\n";
 
     // Cargo vectores PCA con labels
     std::cout << "  Cargando vectores PCA...\n";
-    LabeledVectors raw_data = csv::readLabeledVectors("../data/processed/pca_faces", EMOTION_CATEGORIES);
+    LabeledVectors raw_data = csv::readLabeledVectors(
+        "../data/processed/pca_faces", 
+        EMOTION_CATEGORIES
+    );
 
     // Submuestreo de happy para balancear clases
     LabeledVectors balanced_data = subsampleHappy(raw_data, SUBSAMPLE_RATIO);
@@ -351,7 +419,7 @@ void buildIVFIndex(const IVFConfig& config) {
     std::cout << "    Total vectores: " << N << "\n";
     std::cout << "    Dimensiones: " << D << "\n";
 
-    // Calculo los centroides
+    // Calculo los centroides usando KMeans
     std::cout << "  Ejecutando K-means...\n";
     float* centroids = (float*) malloc(sizeof(float) * C * D);
     int* assignments = new int[N]();
@@ -359,17 +427,19 @@ void buildIVFIndex(const IVFConfig& config) {
 
     // Reordeno vectores por cluster (listas invertidas)
     std::cout << "  Construyendo listas invertidas...\n";
+
+    // cluster_sizes[i] = # elementos de la categoría EMOTION_CATEGORIES[i]
     int* cluster_sizes = new int[C]();
-    for (int i = 0; i < N; i++) {
+    for (int i = 0; i < N; i++) 
         cluster_sizes[assignments[i]]++;
-    }
+ 
     // cluster_offset[c] = "índice en vectors del primer elemento del cluster c"
     int* cluster_offsets = new int[C + 1];
     cluster_offsets[0] = 0;
     for (int c = 0; c < C; c++)
         cluster_offsets[c + 1] = cluster_offsets[c] + cluster_sizes[c];
 
-    // reordeno arrays
+    // Reordeno arrays para que elementos de mismas categorías estén contiguas
     float* vectors_sorted = (float*) malloc(sizeof(float) * N * D);
     int* labels_sorted = new int[N];
     int* write_pos = new int[C]; // dónde escribir el siguiente elemento de cluster c
@@ -377,7 +447,11 @@ void buildIVFIndex(const IVFConfig& config) {
     for (int i = 0; i < N; i++) {
         int c = assignments[i];
         int dest = write_pos[c];
-        std::memcpy(vectors_sorted + dest * D, vectors + i * D, D * sizeof(float));
+        std::memcpy(
+            vectors_sorted + dest * D, 
+            vectors + i * D, 
+            D * sizeof(float)
+        );
         labels_sorted[dest] = labels[i];
         write_pos[c]++;
     }
@@ -411,18 +485,18 @@ void buildIVFIndex(const IVFConfig& config) {
 int main() {
     std::string dataset_path = "../data/dataset/fer2013";
 
-    // [1] Obtengo todas las caras del dataset
+    // Obtengo todas las caras del dataset
     std::vector<std::vector<float>> all_faces;
     collectAllFaces1D(dataset_path, all_faces);
 
-    // [2] Calculo PCA sobre todos los vectores
+    // Calculo PCA sobre todos los vectores
     int num_pca_components = PCA_DIM;
     PCAResult pca_result = computeAndSavePCA(all_faces, num_pca_components);
 
-    // [3] Proyecto todos los vectores sobre la base PCA calculada
+    // Proyecto todos los face features (vectores) sobre la base PCA calculada
     projectFacesToPCA(dataset_path, pca_result.basis, pca_result.mean_vector);
 
-    // [4] Armo y guardo datos para el IVFClassifier
+    // Computo datos particulares para el índice en IVFClassifier
     IVFConfig ivf_config;
     ivf_config.num_clusters = NUM_IVF_CLUSTERS;
     ivf_config.dim = PCA_DIM;
