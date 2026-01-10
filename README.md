@@ -27,8 +27,6 @@ Para esto, tuve en cuenta las siguientes etapas:
 ## Dataset
 El dataset utilizado es **FER-2013**. Reduje las categorías de 7 a 3, ya que con los métodos clásicos de clasificación que elegí (sin redes neuronales ni otros modelos avanzados del state-of-art) no se alcanzaba una buena precisión. Además tuve que implementar un sistema de subsampling para la categoría `happy`, ya que los datos no estan balanceados, lo cual sesga a los clasificadores.
 
-De ahora en más voy a decir que el dataset tiene una longitud de $L$ rostros entre todas las imagenes que lo componen.
-
 ### Distribución
 | label   |   count |
 |:--------|--------:|
