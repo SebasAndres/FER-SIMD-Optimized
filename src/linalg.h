@@ -9,9 +9,6 @@
 #include "types.h"
 #include "constants.h"
 
-// ============================================
-// Funciones de assembly
-// ============================================
 extern "C" {
     float euclideanDistanceASM(
         const float* vec1,
@@ -35,9 +32,6 @@ extern "C" {
     );
 }
 
-// ============================================
-// Distancia euclideana
-// ============================================
 float euclideanDistance(
     const float* vec1,
     const float* vec2,
@@ -50,9 +44,6 @@ float euclideanDistanceC(
     size_t length
 );
 
-// ============================================
-// Centrado de vectores
-// ============================================
 float* centerVector(
     const float* vector,
     const float* mean_vector,
@@ -72,9 +63,6 @@ float** centerVectors(
     size_t vector_dim
 );
 
-// ============================================
-// Vector medio
-// ============================================
 float* calculateMeanVector(
     float** vectors,
     size_t num_vectors,
@@ -87,9 +75,6 @@ float* calculateMeanVectorC(
     size_t vector_dim
 );
 
-// ============================================
-// PCA
-// ============================================
 float dotProduct(
     const float* vec1,
     const float* vec2,
@@ -122,9 +107,6 @@ float** calculatePCABasis(
     size_t* out_vector_dim
 );
 
-// ============================================
-// Matriz de covarianza
-// ============================================
 cv::Mat calculateCovarianceMatrix(
     float** vectors,
     size_t num_vectors,
@@ -137,14 +119,10 @@ float* calculateCovarianceMatrixC(
     size_t vector_dim
 );
 
-// ============================================
-// Extracción de features
-// ============================================
 float* projectInto1D(const cv::Mat& image, size_t* out_size);
 
 float* extractHOG(const cv::Mat& image, size_t* out_size);
 
-// ============================================
 inline void freeVector(float* vec) {
     free(vec);
 }

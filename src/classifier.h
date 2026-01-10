@@ -17,6 +17,7 @@
 
 namespace fs = std::filesystem;
 
+// Clase abstracta
 class FaceClassifier {
 public:
     FaceClassifier();
@@ -38,6 +39,7 @@ protected:
     void loadPCABasis();
 };
 
+// Implementacion por centroides por tipo de emoción
 class CentroidClassifier : public FaceClassifier {
 public:
     CentroidClassifier();
@@ -52,6 +54,7 @@ private:
     void loadCategoryCentroids();
 };
 
+// Implementación por centroides de n_probe clusters
 class IVFClassifier : public FaceClassifier {
 public:
     IVFClassifier();
@@ -68,8 +71,8 @@ private:
     int num_clusters;        // C
     int num_vectors;         // N
     int dim;                 // D
-    int nprobe;              // Clusters a explorar
-    int k;                   // Vecinos para KNN
+    int nprobe;              // subset de clusters a explorar
+    int k;                   // vecinos para KNN
 
     void loadIVFIndex();
 };

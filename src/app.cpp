@@ -16,16 +16,24 @@ void test_camara(cv::VideoCapture& cap){
 }
 
 int main() {
+
     cv::VideoCapture cap(0);
     test_camara(cap);
 
     cv::CascadeClassifier face_detector;
     if (!face_detector.load("face_detection/haarcascade_frontalface_default.xml")) {
-        std::cerr << "Error loading Haar\n";
+        std::cerr << "Error cargando Haar\n";
         exit(1);
     }
 
-    IVFClassifier face_classifier;
+    #if USE_IVF
+        printf("Usando clasificador IVF.\n");
+        IVFClassifier face_classifier;
+    #else
+        printf("Usando clasificador CentroidClassifier.\n");
+        CentroidClassifier face_classifier;
+    #endif
+    
     cv::Mat frame; 
     cv::Mat gray;
     std::vector<cv::Rect> faces;
