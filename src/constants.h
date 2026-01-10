@@ -5,7 +5,7 @@
 #define USE_ASM_IMP 1
 
 // Switch entre IVFClassifier / CentroidClassifier
-#define USE_IVF 1
+#define USE_IVF 1 // Es el que mejor funciona
 
 // Orden y emotion_categories usadas
 #define NUM_EMOTIONS 3
@@ -14,6 +14,7 @@ inline const std::vector<std::string> EMOTION_CATEGORIES = {
 };
 
 // Dimensión de V_d
+// IMPORTANTE: Debe ser múltiplo de 4 para las optimizaciones de SIMD
 #define PCA_DIM 100
 
 // Cantidad total de clusters
@@ -24,11 +25,13 @@ inline const std::vector<std::string> EMOTION_CATEGORIES = {
 #define IMG_PIXELS (IMG_SIZE * IMG_SIZE) 
 
 // HOG Configs
-#define HOG_DIM 900  // HOG: 5x5 bloques x 36 features
 #define HOG_BLOCK_SIZE 16
 #define HOG_BLOCK_STRIDE 8
 #define HOG_CELL_SIZE 8
 #define HOG_NBINS 9            
+
+// IMPORTANTE: Debe ser múltiplo de 4 para las optimizaciones de SIMD
+#define HOG_DIM 900  // HOG: 5x5 bloques x 36 features
 
 // Es el mejor subsample ratio para IVF que testee
 inline constexpr float SUBSAMPLE_RATIO = 1.0f;
