@@ -287,11 +287,7 @@ void trainKMeans(
     int* num_vectors_per_centroid = (int*)std::malloc(C * sizeof(int));
     for (int epoch = 0; epoch < config.kmeans_iters; epoch++) {
 
-        // Reseteo centroides y contadores
-        std::memset(centroids, 0, C * D * sizeof(float));
-        std::memset(num_vectors_per_centroid, 0, C * sizeof(int));
-
-        // Asigno cada vector al centroide mas cercano
+        // Asigno cada vector al centroide mas cercano (con centroides actuales)
         for (int i = 0; i < num_vectors; i++) {
             float* vector = vectors + i * D;
             float min_distance = euclideanDistance(vector, centroids, D);
@@ -307,18 +303,21 @@ void trainKMeans(
             assignments[i] = closest_centroid_index;
         }
 
+        // Reseteo después de asignar y antes de acumular
+        std::memset(centroids, 0, C * D * sizeof(float));
+        std::memset(num_vectors_per_centroid, 0, C * sizeof(int));
+
         // Acumulo vectores en sus centroides
         for (int i = 0; i < num_vectors; i++) {
             int c = assignments[i];
             float* vector = vectors + i * D;
             float* centroid = centroids + c * D;
-            for (int d = 0; d < D; d++) 
+            for (int d = 0; d < D; d++)
                 centroid[d] += vector[d];
             num_vectors_per_centroid[c]++;
         }
 
-        // Divido por cantidad en cada centroide 
-        // para obtener nuevos centroides
+        // Divido por cantidad
         for (int c = 0; c < C; c++) {
             if (num_vectors_per_centroid[c] > 0) {
                 float* centroid = centroids + c * D;
@@ -327,6 +326,7 @@ void trainKMeans(
             }
         }
     }
+
 
     std::free(num_vectors_per_centroid);
 }

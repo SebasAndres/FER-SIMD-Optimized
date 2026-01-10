@@ -210,7 +210,7 @@ float** calculatePCABasis(
     for (size_t i = 0; i < num_components; ++i) {
         pca_basis[i] = (float*)malloc(eigenvectors.rows * sizeof(float));
         for (int j = 0; j < eigenvectors.rows; ++j) {
-            pca_basis[i][j] = eigenvectors.at<float>(j, static_cast<int>(i));
+            pca_basis[i][j] = eigenvectors.at<float>(static_cast<int>(i), j);
         }
     }
 
