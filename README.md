@@ -1,8 +1,6 @@
 # Optimized Facial Expression Recognition with SIMD 
 Proyecto final Arquitectura y Organización del Computador - FCEN UBA
 
-<img src='docs/img/test.png' width=400>
-
 ### Abstract 
 Este proyecto es un clasificador de caras construido en base a `KNN`, `OpenCV` y `HaarExtractionAlgorithm`.
 
