@@ -1,4 +1,4 @@
-# FER con KNN SIMD optimizado 
+# FER con KNN y ANN SIMD optimizado 
 Proyecto final Arquitectura y Organización del Computador - FCEN UBA
 
 ### Abstract 
