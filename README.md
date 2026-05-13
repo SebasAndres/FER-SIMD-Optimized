@@ -1,4 +1,4 @@
-# Optimized Facial Expression Recognition with SIMD 
+# FER con KNN SIMD optimizado 
 Proyecto final Arquitectura y Organización del Computador - FCEN UBA
 
 ### Abstract 
