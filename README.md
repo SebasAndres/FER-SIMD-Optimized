@@ -1,7 +1,5 @@
-# Optimized Facial Expression Recognition with SIMD 
+# FER con KNN y ANN SIMD optimizado 
 Proyecto final Arquitectura y Organización del Computador - FCEN UBA
-
-<img src='docs/img/test.png' width=400>
 
 ### Abstract 
 Este proyecto es un clasificador de caras construido en base a `KNN`, `OpenCV` y `HaarExtractionAlgorithm`.
@@ -61,7 +59,7 @@ Una vez recortada la imagen de la cara, para vectorizar esos píxeles realice di
 El sustento de esto es que para poder encontrar features distintivos de cada tipo de imagen, es útil asemejarlas en factores que nada tienen que ver con lo que queremos detectar, esto es las luces/iluminación del lugar de la imagen, el tamaño de la cara en la misma, luego aplico una extracción de features HOG, de la cual luego profundizo más, y finalmente aplico la proyección *PCA* para reducir el tamaño de los vectores de características que despues manipulo para computar la clasificación. Por defecto, dejé el `num_components` de PCA igual a 100, pero es configurable en `src/constants.h` (debe ser un multiplo de 4, para las optimizaciones que hice en SIMD posteriormente).
 
 ### Aplicación de PCA
-La motivación para implementar PCA vino por parte de mi reciente cursada de ALC (Métodos Numéricos). Apartir del estudio de las distintas descomposiciones de una matriz y cómo muestran estas propiedades inherentes de la misma, se puede estudiar la correlación entre componentes de un vector y colapsar aquellas que representen, en esencia, la misma información. 
+La motivación para implementar PCA vino por parte de mi reciente cursada de ALC (Métodos Numéricos). A partir del estudio de las distintas descomposiciones de una matriz y cómo muestran estas propiedades inherentes de la misma, se puede estudiar la correlación entre componentes de un vector y colapsar aquellas que representen, en esencia, la misma información. 
 
 **Prop:** Un vector $y$ representado en una base $B$ puede escribirse en otra base $V$ a partir de un cambio de base $[y]_V = C_{BV}[y]_B$.
 
