@@ -114,9 +114,169 @@ docker compose run fer bash
 cd src && make pipeline
 ```
 
-#### Opcion local: 
+#### Opcion local:
 ```bash
 sudo apt update && sudo apt install pkg-config libopencv-dev
 cd src && make pipeline
 ```
 El debugging con `gdb` está habilitado en el `Makefile` para realizar tests/experimentos.
+
+---
+
+## Instrucciones de Instalación por Sistema Operativo
+
+### Requisitos de Hardware
+Este proyecto utiliza código Assembly x86-64 con instrucciones SIMD (SSE/SSE3), por lo que **requiere un procesador x86-64** (Intel o AMD). No es compatible con procesadores ARM (como Apple Silicon M1/M2/M3).
+
+### Linux (Ubuntu/Debian) - Recomendado
+
+```bash
+# 1. Instalar dependencias del sistema
+sudo apt update
+sudo apt install -y build-essential g++ pkg-config libopencv-dev nasm python3 python3-pip
+
+# 2. (Opcional) Instalar uv para gestión de Python
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 3. Clonar el repositorio
+git clone https://github.com/tu-usuario/FER-SIMD-Optimized.git
+cd FER-SIMD-Optimized
+
+# 4. Ejecutar el pipeline
+cd src && make pipeline
+```
+
+### Linux (Fedora/RHEL/CentOS)
+
+```bash
+# 1. Instalar dependencias del sistema
+sudo dnf install -y gcc-c++ make pkgconfig opencv-devel nasm python3 python3-pip
+
+# 2. (Opcional) Instalar uv para gestión de Python
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 3. Clonar y ejecutar
+git clone https://github.com/tu-usuario/FER-SIMD-Optimized.git
+cd FER-SIMD-Optimized/src && make pipeline
+```
+
+### Linux (Arch Linux)
+
+```bash
+# 1. Instalar dependencias del sistema
+sudo pacman -S base-devel opencv nasm python python-pip
+
+# 2. (Opcional) Instalar uv para gestión de Python
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 3. Clonar y ejecutar
+git clone https://github.com/tu-usuario/FER-SIMD-Optimized.git
+cd FER-SIMD-Optimized/src && make pipeline
+```
+
+### macOS (Intel x86-64 solamente)
+
+> **Nota:** Este proyecto NO es compatible con Mac con Apple Silicon (M1/M2/M3) debido al código Assembly x86-64.
+
+```bash
+# 1. Instalar Homebrew si no lo tienes
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# 2. Instalar dependencias
+brew install opencv nasm pkg-config
+
+# 3. Clonar el repositorio
+git clone https://github.com/tu-usuario/FER-SIMD-Optimized.git
+cd FER-SIMD-Optimized
+
+# 4. Modificar el Makefile para macOS (cambiar formato de objeto)
+cd src
+sed -i '' 's/-felf64/-fmacho64/g' Makefile
+
+# 5. Ejecutar el pipeline
+make pipeline
+```
+
+### Windows (WSL2 - Recomendado)
+
+La forma más sencilla de ejecutar este proyecto en Windows es usando WSL2 (Windows Subsystem for Linux).
+
+```powershell
+# 1. Abrir PowerShell como Administrador e instalar WSL2
+wsl --install -d Ubuntu
+
+# 2. Reiniciar la computadora si es necesario
+
+# 3. Abrir Ubuntu desde el menú de inicio y seguir las instrucciones de Linux (Ubuntu/Debian)
+```
+
+### Docker (Multiplataforma - x86-64)
+
+Docker es la opción más portable para sistemas x86-64. Funciona en Linux, macOS Intel y Windows.
+
+```bash
+# 1. Instalar Docker Desktop (Windows/macOS) o Docker Engine (Linux)
+# https://docs.docker.com/get-docker/
+
+# 2. Clonar el repositorio
+git clone https://github.com/tu-usuario/FER-SIMD-Optimized.git
+cd FER-SIMD-Optimized
+
+# 3. Construir la imagen
+docker compose build
+
+# 4. Ejecutar (con soporte de interfaz gráfica para Linux)
+# Linux:
+xhost +local:docker
+docker compose run fer bash
+cd src && make pipeline
+
+# Windows/macOS (sin interfaz gráfica, solo procesamiento):
+docker compose run fer bash
+cd src && make pipeline
+```
+
+### Tabla de Compatibilidad
+
+| Sistema Operativo | Arquitectura | Soporte | Método Recomendado |
+|-------------------|--------------|---------|-------------------|
+| Linux (Ubuntu/Debian/Fedora/Arch) | x86-64 | Nativo | Instalación local |
+| macOS | Intel x86-64 | Con modificaciones | Docker o local (modificado) |
+| macOS | Apple Silicon (M1/M2/M3) | No soportado | - |
+| Windows 10/11 | x86-64 | Via WSL2 | WSL2 + Ubuntu |
+| Windows 10/11 | x86-64 | Via Docker | Docker Desktop |
+
+### Troubleshooting
+
+**Error: `pkg-config: opencv4 not found`**
+```bash
+# Verificar que OpenCV está instalado correctamente
+pkg-config --modversion opencv4
+# Si no funciona, probar con opencv (sin el 4)
+pkg-config --modversion opencv
+```
+
+**Error: `nasm: command not found`**
+```bash
+# Ubuntu/Debian
+sudo apt install nasm
+# Fedora
+sudo dnf install nasm
+# macOS
+brew install nasm
+```
+
+**Error de permisos al ejecutar la cámara en Linux**
+```bash
+# Agregar tu usuario al grupo video
+sudo usermod -aG video $USER
+# Cerrar sesión y volver a iniciar
+```
+
+**Problemas con la ventana gráfica en Docker**
+```bash
+# Asegurarse de ejecutar antes de docker compose run:
+xhost +local:docker
+# Verificar que DISPLAY está configurado
+echo $DISPLAY
+```
